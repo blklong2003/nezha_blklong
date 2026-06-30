@@ -1,0 +1,14 @@
+{
+  "name": "NeZha 远程",
+  "short_name": "NeZha",
+  "description": "AI 任务远程控制面板",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#1d212a",
+  "theme_color": "#1d212a",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

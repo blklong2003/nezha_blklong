@@ -1,0 +1,119 @@
+param(
+    [Parameter(Position = 0)]
+    [string]$Version,
+
+    [switch]$NoConfirm
+)
+
+$ErrorActionPreference = "Stop"
+
+# ─── Help ───────────────────────────────────────────────────────────
+if (-not $Version -or $Version -eq "-?" -or $Version -eq "--help") {
+    Write-Host @"
+用法: .\scripts\bump-version.ps1 <版本号> [-NoConfirm]
+
+版本号格式: <主>.<次>.<补丁>.<定制构建号>-my
+示例: .\scripts\bump-version.ps1 0.4.3.2-my
+"@ -ForegroundColor Cyan
+    exit 0
+}
+
+# ─── Validate version format ───────────────────────────────────────
+$pattern = '^\d+\.\d+\.\d+\.\d+-my$'
+if ($Version -notmatch $pattern) {
+    Write-Host "❌ 版本号格式错误: $Version" -ForegroundColor Red
+    Write-Host "   正确格式: <主>.<次>.<补丁>.<构建号>-my (如 0.4.3.2-my)" -ForegroundColor Yellow
+    exit 1
+}
+
+# ─── Paths ──────────────────────────────────────────────────────────
+$rootDir = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
+$versionFile = Join-Path $rootDir ".version"
+$cargoFile   = Join-Path $rootDir "src-tauri\Cargo.toml"
+$tauriConf   = Join-Path $rootDir "src-tauri\tauri.conf.json"
+$pkgJsonFile = Join-Path $rootDir "package.json"
+
+# ─── Read current version ───────────────────────────────────────────
+$currentVersion = ""
+if (Test-Path $versionFile) {
+    $currentVersion = (Get-Content $versionFile -Raw).Trim()
+}
+
+# ─── Parse version components ───────────────────────────────────────
+$verMatch = [regex]::Match($Version, '^(\d+)\.(\d+)\.(\d+)\.(\d+)-my$')
+$upstreamVer = "$($verMatch.Groups[1]).$($verMatch.Groups[2]).$($verMatch.Groups[3])"
+
+# ─── Show git log since last matching tag ──────────────────────────
+Push-Location $rootDir
+try {
+    Write-Host "`n=== NeZha 版本升级 ===" -ForegroundColor Cyan
+    Write-Host "当前版本: $currentVersion" -ForegroundColor Yellow
+    Write-Host "目标版本: $Version" -ForegroundColor Green
+    Write-Host ""
+
+    # Find the last my-build tag
+    $lastTag = git tag --list 'v*.*.*.*-my' --sort=-version:refname | Select-Object -First 1
+    if ($lastTag) {
+        Write-Host "自上一个定制标签 [$lastTag] 以来的提交:" -ForegroundColor Cyan
+        $log = git log --oneline "$lastTag..HEAD" --no-merges 2>$null
+        if ($log) {
+            Write-Host $log -ForegroundColor Gray
+        } else {
+            Write-Host "  (没有新提交)" -ForegroundColor DarkGray
+        }
+    } else {
+        Write-Host "未找到历史定制标签，显示最近提交:" -ForegroundColor Cyan
+        $log = git log --oneline -10 --no-merges
+        if ($log) { Write-Host $log -ForegroundColor Gray }
+    }
+
+    Write-Host ""
+
+    # File changes preview
+    Write-Host "将更新的文件:" -ForegroundColor Cyan
+    Write-Host "  .version:          $currentVersion → $Version" -ForegroundColor Gray
+    Write-Host "  Cargo.toml:        version = ""$upstreamVer""" -ForegroundColor Gray
+    Write-Host "  tauri.conf.json:   version = ""$upstreamVer""" -ForegroundColor Gray
+    Write-Host "  package.json:      version = ""$Version""" -ForegroundColor Gray
+
+    # ─── Confirm ──────────────────────────────────────────────────
+    if (-not $NoConfirm) {
+        Write-Host ""
+        $confirmation = Read-Host "确认升级版本? [Y/n]"
+        if ($confirmation -ne "" -and $confirmation -ne "Y" -and $confirmation -ne "y") {
+            Write-Host "已取消。" -ForegroundColor Red
+            exit 0
+        }
+    }
+
+    # ─── Write .version ───────────────────────────────────────────
+    Set-Content -Path $versionFile -Value $Version -NoNewline
+    Write-Host "  ✓ .version" -ForegroundColor Green
+
+    # ─── Update Cargo.toml ────────────────────────────────────────
+    $cargoContent = Get-Content $cargoFile -Raw
+    $cargoContent = $cargoContent -replace '^version\s*=\s*"[^"]*"', "version = `"$upstreamVer`""
+    Set-Content -Path $cargoFile -Value $cargoContent -NoNewline
+    Write-Host "  ✓ Cargo.toml → $upstreamVer" -ForegroundColor Green
+
+    # ─── Update tauri.conf.json ───────────────────────────────────
+    $tauriContent = Get-Content $tauriConf -Raw
+    $tauriContent = $tauriContent -replace '"version"\s*:\s*"[^"]*"', "`"version`": `"$upstreamVer`""
+    Set-Content -Path $tauriConf -Value $tauriContent -NoNewline
+    Write-Host "  ✓ tauri.conf.json → $upstreamVer" -ForegroundColor Green
+
+    # ─── Update package.json ──────────────────────────────────────
+    $pkgContent = Get-Content $pkgJsonFile -Raw
+    $pkgContent = $pkgContent -replace '"version"\s*:\s*"[^"]*"', "`"version`": `"$Version`""
+    Set-Content -Path $pkgJsonFile -Value $pkgContent -NoNewline
+    Write-Host "  ✓ package.json → $Version" -ForegroundColor Green
+
+    # ─── Git commit ───────────────────────────────────────────────
+    git add ".version" "src-tauri/Cargo.toml" "src-tauri/tauri.conf.json" "package.json"
+    git commit -m "chore(version): bump to v$Version"
+
+    Write-Host "`n✅ 版本升级完成: $currentVersion → $Version (commit: $(git rev-parse --short HEAD))" -ForegroundColor Green
+}
+finally {
+    Pop-Location
+}
