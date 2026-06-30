@@ -1,17 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ChevronLeft, Send, RefreshCw, Bell, BellRing } from "lucide-react";
+import { ChevronLeft, Send, RefreshCw, Bell, BellRing, ArrowDown } from "lucide-react";
 import { useI18n } from "../i18n";
-import { MessageList, type SessionMessage } from "../components/session-view";
+import { MessageList } from "../components/session-view";
 import {
   remoteSource,
-  streamOutput,
   subscribeLiveTasks,
-  isTaskActive,
   enablePush,
   hasPushSubscription,
   type RemoteProject,
   type RemoteTask,
 } from "./data/remoteSource";
+import { useLiveConversation } from "./hooks/useLiveConversation";
 
 type View =
   | { kind: "projects" }
@@ -252,69 +251,46 @@ function TasksView({
   );
 }
 
-/**
- * 实时会话：结构化消息（语义流）为主；任务活跃时叠加原始输出 live tail（即时反馈），
- * tail 停更 1.5s 后回拉 /messages 让本轮「落定」为干净结构化，并清空 tail。
- */
-function useLiveConversation(task: RemoteTask) {
-  const [messages, setMessages] = useState<SessionMessage[]>([]);
-  const [liveTail, setLiveTail] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  const refresh = useCallback(() => {
-    remoteSource
-      .loadMessages(task.id)
-      .then((m) => {
-        setMessages(m);
-        setLiveTail("");
-      })
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
-  }, [task.id]);
-
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    setLiveTail("");
-    refresh();
-
-    // 已结束的任务不订阅实时流——浏览历史时保持干净，避免重放原始输出。
-    if (!isTaskActive(task.status)) return;
-
-    const stop = streamOutput(task.id, 0, (text) => {
-      setLiveTail((prev) => (prev + text).slice(-8000)); // 限长，避免无限增长
-      clearTimeout(settleTimer.current);
-      settleTimer.current = setTimeout(refresh, 1500);
-    });
-    return () => {
-      stop();
-      clearTimeout(settleTimer.current);
-    };
-  }, [task.id, task.status, refresh]);
-
-  return { messages, liveTail, loading, error };
-}
-
 function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => void }) {
   const { t } = useI18n();
-  const { messages, liveTail, loading, error } = useLiveConversation(task);
+  const { messages, liveTail, loading, error, refresh } = useLiveConversation(task.id, task.status);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
+  const [newCount, setNewCount] = useState(0);
+  const prevMessageLen = useRef(0);
+  const [connStatus, setConnStatus] = useState<"connected" | "disconnected">("connected");
 
   // 粘底：仅当用户已在底部附近时自动滚到底，避免上滑看历史时被拽回。
+  // 同时跟踪新消息数量（用户已上滑时显示「↓ N 条新消息」浮标）。
   useEffect(() => {
     const el = scrollRef.current;
-    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    if (stickRef.current) {
+      el.scrollTop = el.scrollHeight;
+      setNewCount(0);
+    } else {
+      const added = messages.length - prevMessageLen.current;
+      if (added > 0) setNewCount((c) => c + added);
+    }
+    prevMessageLen.current = messages.length;
   }, [messages, liveTail]);
 
   function onScroll() {
     const el = scrollRef.current;
     if (!el) return;
-    stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (atBottom) setNewCount(0);
+    stickRef.current = atBottom;
+  }
+
+  function scrollToBottom() {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    stickRef.current = true;
+    setNewCount(0);
   }
 
   async function send() {
@@ -324,6 +300,7 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
     try {
       await remoteSource.sendInput(task.id, msg);
       setInput("");
+      scrollToBottom();
     } catch {
       /* ignore */
     } finally {
@@ -332,18 +309,48 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
   }
 
   return (
-    <>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
       <div style={header}>
         <button style={backBtn} onClick={onBack} aria-label="back">
           <ChevronLeft size={20} />
         </button>
         <StatusDot status={task.status} />
         <span style={titleStyle}>{taskTitle(task)}</span>
+        {connStatus === "disconnected" && (
+          <button
+            style={{ ...backBtn, color: "#ef4444", fontSize: 11, width: "auto", padding: "0 4px" }}
+            onClick={() => { refresh(); setConnStatus("connected"); }}
+            title="Reconnect"
+          >
+            ●
+          </button>
+        )}
       </div>
+      {connStatus === "disconnected" && (
+        <div
+          style={{
+            padding: "6px 14px",
+            fontSize: 11,
+            color: "#fff",
+            background: "#ef4444",
+            textAlign: "center",
+            flexShrink: 0,
+          }}
+        >
+          {t("session.unableToLoad", { error: "Connection lost" })}
+          {" · "}
+          <button
+            onClick={() => { refresh(); setConnStatus("connected"); }}
+            style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", textDecoration: "underline" }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        style={{ flex: 1, overflowY: "auto", padding: "16px 14px 8px" }}
+        style={{ flex: 1, overflowY: "auto", padding: "16px 14px 8px", position: "relative" }}
       >
         {loading && <Hint>{t("session.loading")}</Hint>}
         {error && <Hint>{error}</Hint>}
@@ -352,7 +359,7 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
         )}
         <MessageList messages={messages} />
         {liveTail && (
-          <pre
+          <div
             style={{
               margin: "8px 0 0",
               padding: "8px 10px",
@@ -365,12 +372,54 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
               opacity: 0.85,
+              display: "flex",
+              gap: 8,
+              alignItems: "flex-start",
             }}
           >
-            {liveTail}
-          </pre>
+            <span style={{ flexShrink: 0, marginTop: 3 }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 7,
+                  height: 7,
+                  borderRadius: "50%",
+                  background: "#4ade80",
+                  animation: "nezha-pulse 1.5s ease-in-out infinite",
+                }}
+              />
+            </span>
+            <span style={{ flex: 1 }}>{liveTail}</span>
+          </div>
         )}
       </div>
+      {newCount > 0 && (
+        <button
+          onClick={scrollToBottom}
+          style={{
+            position: "absolute",
+            bottom: 70,
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 14px",
+            borderRadius: 20,
+            background: "var(--accent, #4ade80)",
+            color: "#fff",
+            border: "none",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            zIndex: 10,
+          }}
+        >
+          <ArrowDown size={14} />
+          {newCount} new
+        </button>
+      )}
       <div
         style={{
           display: "flex",
@@ -421,7 +470,7 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
           <Send size={17} />
         </button>
       </div>
-    </>
+    </div>
   );
 }
 

@@ -2,8 +2,18 @@ import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { writeClipboardText } from "../file-explorer/clipboard";
 
+/** 相对时间格式化（毫秒）。 */
+function formatTime(ts: number): string {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  const d = new Date(ts);
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
 /** 用户消息气泡——右对齐 + 悬停复制。纯渲染。 */
-export function UserMessageBubble({ text }: { text: string }) {
+export function UserMessageBubble({ text, createdAt }: { text: string; createdAt?: number }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -16,7 +26,7 @@ export function UserMessageBubble({ text }: { text: string }) {
   };
 
   return (
-    <div style={{ marginBottom: 14, display: "flex", justifyContent: "flex-end" }}>
+    <div style={{ marginBottom: 14, display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
       <div
         style={{ maxWidth: "72%", position: "relative" }}
         className="user-message-bubble"
@@ -68,6 +78,19 @@ export function UserMessageBubble({ text }: { text: string }) {
           {text}
         </div>
       </div>
+      {createdAt && (
+        <div
+          style={{
+            fontSize: 10,
+            color: "var(--text-hint)",
+            marginTop: 4,
+            marginRight: 8,
+            opacity: 0.6,
+          }}
+        >
+          {formatTime(createdAt)}
+        </div>
+      )}
     </div>
   );
 }

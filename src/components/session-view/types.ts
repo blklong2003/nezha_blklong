@@ -13,4 +13,6 @@ export interface SessionContent {
 export interface SessionMessage {
   role: "user" | "assistant";
   content: SessionContent[];
+  /** 消息创建时间戳（毫秒），可能缺失。 */
+  created_at?: number;
 }

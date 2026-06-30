@@ -630,6 +630,9 @@ fn process_claude_session_line(
 pub(crate) struct SessionMessage {
     role: String,
     content: Vec<SessionContent>,
+    /// 消息创建时间戳（毫秒）。部分消息可能没有，前端会 fallback 到无显示。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    created_at: Option<i64>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -735,6 +738,12 @@ fn parse_claude_session(lines: &[&str]) -> Vec<SessionMessage> {
             continue;
         };
 
+        // try message-level created_at first, then top-level
+        let created_at = message
+            .get("created_at")
+            .and_then(|v| v.as_i64())
+            .or_else(|| val.get("created_at").and_then(|v| v.as_i64()));
+
         match msg_type {
             "user" => {
                 let parts = claude_user_content(message.get("content"));
@@ -742,6 +751,7 @@ fn parse_claude_session(lines: &[&str]) -> Vec<SessionMessage> {
                     messages.push(SessionMessage {
                         role: "user".to_string(),
                         content: parts,
+                        created_at,
                     });
                 }
             }
@@ -755,6 +765,7 @@ fn parse_claude_session(lines: &[&str]) -> Vec<SessionMessage> {
                     messages.push(SessionMessage {
                         role: "assistant".to_string(),
                         content: parts,
+                        created_at,
                     });
                 }
             }
@@ -843,6 +854,12 @@ fn parse_codex_session(lines: &[&str]) -> Vec<SessionMessage> {
         let event_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
         let payload = val.get("payload");
 
+        // try payload-level created_at first, then top-level
+        let created_at = payload
+            .and_then(|p| p.get("created_at"))
+            .and_then(|v| v.as_i64())
+            .or_else(|| val.get("created_at").and_then(|v| v.as_i64()));
+
         match event_type {
             "event_msg" => {
                 let payload_type = payload
@@ -860,6 +877,7 @@ fn parse_codex_session(lines: &[&str]) -> Vec<SessionMessage> {
                             content: vec![SessionContent::Text {
                                 text: text.to_string(),
                             }],
+                            created_at,
                         });
                     }
                 }
@@ -907,6 +925,7 @@ fn parse_codex_session(lines: &[&str]) -> Vec<SessionMessage> {
                                 messages.push(SessionMessage {
                                     role: "assistant".to_string(),
                                     content: parts,
+                                    created_at,
                                 });
                             }
                         }
@@ -941,6 +960,7 @@ fn parse_codex_session(lines: &[&str]) -> Vec<SessionMessage> {
                             messages.push(SessionMessage {
                                 role: "assistant".to_string(),
                                 content: vec![part],
+                                created_at,
                             });
                         }
                     }
@@ -1987,6 +2007,7 @@ mod tests {
                     thinking: "let me think".to_string(),
                 },
             ],
+            created_at: None,
         };
         let j = serde_json::to_value(&msg).unwrap();
         assert_eq!(j["role"], "assistant");
@@ -1999,6 +2020,17 @@ mod tests {
         assert_eq!(j["content"][1]["input"], "{\"cmd\":\"ls\"}");
         assert_eq!(j["content"][2]["type"], "thinking");
         assert_eq!(j["content"][2]["thinking"], "let me think");
+        // created_at 为 None 时应从 JSON 中跳过
+        assert!(j.get("created_at").is_none(), "created_at field should be skipped when None");
+
+        // created_at 为 Some 时应正确序列化
+        let msg_with_ts = SessionMessage {
+            role: "user".to_string(),
+            content: vec![SessionContent::Text { text: "hi".to_string() }],
+            created_at: Some(1_715_990_400_000i64),
+        };
+        let j2 = serde_json::to_value(&msg_with_ts).unwrap();
+        assert_eq!(j2["created_at"], 1_715_990_400_000i64);
     }
 
     #[test]
@@ -2220,6 +2252,7 @@ mod tests {
                         text: "first turn".into(),
                     },
                 ],
+                created_at: None,
             },
             SessionMessage {
                 role: "assistant".into(),
@@ -2228,12 +2261,14 @@ mod tests {
                     name: "Bash".into(),
                     input: "{\"cmd\":\"ls\"}".into(),
                 }],
+                created_at: None,
             },
             SessionMessage {
                 role: "assistant".into(),
                 content: vec![SessionContent::Text {
                     text: "second turn".into(),
                 }],
+                created_at: None,
             },
         ];
         let md = render_to_string(&sample_meta(), &messages);
