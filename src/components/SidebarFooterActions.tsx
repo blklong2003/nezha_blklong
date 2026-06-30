@@ -88,18 +88,19 @@ export function SidebarFooterActions({
         {ENABLE_USAGE_INSIGHTS ? <UsagePopover /> : null}
       </div>
 
-      <div
-        style={{
-          textAlign: "center",
-          fontSize: 10,
-          color: "var(--text-hint)",
-          padding: "4px 0 6px",
-          opacity: 0.5,
-          userSelect: "none",
-        }}
-      >
-        v{__APP_VERSION__}
-      </div>
+      {__APP_VERSION__ ? (
+        <div
+          style={{
+            textAlign: "center",
+            fontSize: 10,
+            color: "var(--text-hint)",
+            padding: "4px 0 6px",
+            opacity: 0.5,
+          }}
+        >
+          v{__APP_VERSION__}
+        </div>
+      ) : null}
 
       {showAppSettings && (
         <AppSettingsDialog

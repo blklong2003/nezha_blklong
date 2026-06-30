@@ -14,6 +14,11 @@ $ErrorActionPreference = "Stop"
 $versionFile = Join-Path $PSScriptRoot ".version"
 $oldVersion = (Get-Content $versionFile -Raw).Trim()
 
+# Validate: must match X.Y.Z.N-suffix (e.g. 0.4.3.21-my)
+if ($oldVersion -notmatch '^\d+\.\d+\.\d+\.\d+-[\w.]+$') {
+    throw "Invalid .version format: '$oldVersion'. Expected X.Y.Z.N-suffix (e.g. 0.4.4.0-my)"
+}
+
 # Parse: "0.4.3.21-my" → parts @("0","4","3","21-my")
 $parts = $oldVersion -split '\.'
 $base = $parts[0..2] -join '.'   # "0.4.3"
@@ -26,16 +31,20 @@ $newVersion = "$base.$patchNum-$suffix"
 Write-Host "Bumping version: $oldVersion → $newVersion" -ForegroundColor Cyan
 Set-Content -Path $versionFile -Value $newVersion -NoNewline
 
-# ---- 2. Update Cargo.toml version ----
+# ---- 2. Update Cargo.toml version (only [package] section) ----
 $cargoFile = Join-Path $PSScriptRoot "src-tauri" "Cargo.toml"
 $cargo = Get-Content $cargoFile -Raw
-$cargo = $cargo -replace '^version = "[\d.]+"', "version = `"$base`""
+$cargo = $cargo -replace '(?m)^version = "[\d.]+"', "version = `"$base`""
 Set-Content -Path $cargoFile -Value $cargo
 
 # ---- 3. pnpm install + build ----
-Write-Host "`npnpm install..." -ForegroundColor Cyan
-& pnpm install
-if ($LASTEXITCODE -ne 0) { throw "pnpm install failed" }
+Write-Host "`npnpm install --frozen-lockfile..." -ForegroundColor Cyan
+& pnpm install --frozen-lockfile
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Frozen lockfile failed — trying pnpm install (lockfile may have drifted)"
+    & pnpm install
+    if ($LASTEXITCODE -ne 0) { throw "pnpm install failed" }
+}
 
 Write-Host "`nBuild..." -ForegroundColor Cyan
 & pnpm tauri build
@@ -47,12 +56,11 @@ $originalExe = Join-Path $targetDir "nezha.exe"
 $newExeName = "nezha-v$newVersion.exe"
 $newExe = Join-Path $targetDir $newExeName
 
-if (Test-Path $originalExe) {
-    Copy-Item -Path $originalExe -Destination $newExe -Force
-    Write-Host "Renamed: $newExeName" -ForegroundColor Green
-} else {
-    Write-Warning "nezha.exe not found at $originalExe — skipping rename"
+if (-not (Test-Path $originalExe)) {
+    throw "Build binary not found at $originalExe — cannot complete release"
 }
+Copy-Item -Path $originalExe -Destination $newExe -Force
+Write-Host "Renamed: $newExeName" -ForegroundColor Green
 
 # ---- 5. Windows autostart (HKCU) ----
 $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
@@ -61,11 +69,11 @@ Set-ItemProperty -Path $regPath -Name $regName -Value $newExe.FullName
 Write-Host "Autostart registry updated: $regName → $($newExe.FullName)" -ForegroundColor Green
 
 # ---- 6. Git tag ----
-try {
-    & git tag -f "v$newVersion"
+& git tag -f "v$newVersion"
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Git tagging failed (exit code: $LASTEXITCODE) — is .git present?"
+} else {
     Write-Host "Tagged: v$newVersion" -ForegroundColor Green
-} catch {
-    Write-Warning "Git tagging failed: $_"
 }
 
 # ---- 7. CHANGELOG ----
