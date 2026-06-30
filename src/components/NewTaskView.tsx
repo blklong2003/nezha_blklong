@@ -18,6 +18,7 @@ import {
 import { ImageAttachments } from "./new-task/ImageAttachments";
 import { TextAttachments, type PastedText } from "./new-task/TextAttachments";
 import { AgentPermSelector } from "./new-task/AgentPermSelector";
+import { ProviderSelector } from "./new-task/ProviderSelector";
 import { LaunchModeSelector, type LaunchMode } from "./new-task/LaunchModeSelector";
 import { useI18n } from "../i18n";
 import { APP_PLATFORM } from "../platform";
@@ -94,7 +95,7 @@ export function NewTaskView({
   const [planMode, setPlanMode] = useState(initialDraft?.planMode ?? false);
   const [launchMode, setLaunchMode] = useState<LaunchMode>(initialDraft?.launchMode ?? "local");
   const [baseBranch, setBaseBranch] = useState<string>(initialDraft?.baseBranch ?? "");
-
+  const [providerId, setProviderId] = useState("");
   const [allFiles, setAllFiles] = useState<FileEntry[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [crossProjectFiles, setCrossProjectFiles] = useState<CrossProjectFileMap>(new Map());
@@ -595,6 +596,14 @@ export function NewTaskView({
           }}
           onSubmit={handleSubmit}
         />
+        {/* cc-switch provider selector */}
+        <div style={{ padding: "0 14px 8px" }}>
+          <ProviderSelector
+            agent={agent}
+            providerId={providerId}
+            onSetProviderId={setProviderId}
+          />
+        </div>
       </div>
 
       {/* Launch mode + base branch (compose card 外、独立一栏) */}

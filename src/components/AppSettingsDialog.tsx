@@ -10,6 +10,7 @@ import {
   Blocks,
   Heart,
   ExternalLink,
+  Radio,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type {
@@ -36,6 +37,7 @@ import { ThemePanel } from "./app-settings/ThemePanel";
 import { FontPanel } from "./app-settings/FontPanel";
 import { HooksPanel } from "./app-settings/HooksPanel";
 import { SkillsPanel } from "./app-settings/SkillsPanel";
+import { RemotePanel } from "./app-settings/RemotePanel";
 import { getAgentSettingsFilePath } from "./app-settings/shared";
 import type { AgentKey, AppSettingsNavItem, NavKey, NavSection } from "./app-settings/types";
 
@@ -46,6 +48,7 @@ const NAV_ITEMS: AppSettingsNavItem[] = [
   { key: "shortcuts", labelKey: "appSettings.shortcuts", section: "application", icon: Keyboard },
   { key: "hooks", labelKey: "appSettings.hooks", section: "application", icon: Zap },
   { key: "skills", labelKey: "skill.settings.navLabel", section: "application", icon: Blocks },
+  { key: "remote", labelKey: "appSettings.remote", section: "application", icon: Radio },
   {
     key: "claude",
     labelKey: "Claude Code",
@@ -249,6 +252,8 @@ export function AppSettingsDialog({
             <HooksPanel key="hooks" />
           ) : activeNav === "skills" ? (
             <SkillsPanel key="skills" />
+          ) : activeNav === "remote" ? (
+            <RemotePanel key="remote" />
           ) : activeNav === "about" ? (
             <AboutPanel key="about" />
           ) : activeNav === "thanks" ? (

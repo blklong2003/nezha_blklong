@@ -8,6 +8,7 @@ export type NavKey =
   | "shortcuts"
   | "hooks"
   | "skills"
+  | "remote"
   | "about"
   | "thanks"
   | "community"
