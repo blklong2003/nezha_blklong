@@ -17,6 +17,7 @@ import {
   RAIL_DRAG_THRESHOLD_PX,
   RAIL_PADDING_TOP,
   RAIL_SUPPRESS_CLICK_MS,
+  getRailItemTranslateY,
   type DragOrigin,
   type DragViz,
 } from "./project-rail/drag";
@@ -682,6 +683,23 @@ export function ProjectRail({
                 groupProjects.map((project) => {
                   const isDragging = dragOrigin?.draggedId === project.id;
                   const activity = getProjectActivity(projectActivityById, project.id);
+                  // 让位动画：非拖拽项根据 dragViz.dropIndex 平移
+                  let translateY = 0;
+                  if (dragViz && !isDragging && dragOrigin) {
+                    const domButtons = Array.from(
+                      railContainerRef.current?.querySelectorAll<HTMLButtonElement>("[data-rail-id]") ?? [],
+                    );
+                    const visibleIds = domButtons
+                      .map((b) => b.dataset.railId)
+                      .filter((id): id is string => !!id);
+                    if (visibleIds.length > 1) {
+                      const draggedIdx = visibleIds.indexOf(dragOrigin.draggedId);
+                      const thisIdx = visibleIds.indexOf(project.id);
+                      if (draggedIdx !== -1 && thisIdx !== -1) {
+                        translateY = getRailItemTranslateY(thisIdx, draggedIdx, dragViz.dropIndex);
+                      }
+                    }
+                  }
                   return (
                     <RailItem
                       key={project.id}
@@ -692,7 +710,7 @@ export function ProjectRail({
                       showBadge={attentionBadge}
                       waveNonce={waveNonces.get(project.id) ?? 0}
                       isDragging={isDragging}
-                      translateY={0}
+                      translateY={translateY}
                       onPointerDown={handleRailItemPointerDown}
                       onClick={handleRailItemClick}
                       onContextMenu={handleProjectContextMenu}
