@@ -136,6 +136,8 @@ export function ProjectRail({
     setDraggingGroupId(groupId);
   }, []);
 
+  const groupDropTargetRef = useRef<string | null>(null);
+
   const handleGroupMove = useCallback(
     (e: PointerEvent) => {
       if (!draggingGroupId) return;
@@ -143,23 +145,38 @@ export function ProjectRail({
       if (!container) return;
 
       // 找到鼠标下方的分组头
-      const headers = container.querySelectorAll<HTMLElement>("[data-group-id]");
+      const headers = Array.from(container.querySelectorAll<HTMLElement>("[data-group-id]"));
       let targetId: string | null = null;
+
       for (const header of headers) {
         const rect = header.getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
+        // 跳过正在拖拽的分组本身
+        if (header.dataset.groupId === draggingGroupId) continue;
         if (e.clientY < midY) {
           targetId = header.dataset.groupId || null;
           break;
         }
       }
+
+      // 如果没有找到目标（鼠标在最下面），放到最后一个分组之后
+      if (!targetId && headers.length > 1) {
+        const sortedGroups = [...groups].sort((a, b) => a.order - b.order);
+        const lastGroup = sortedGroups[sortedGroups.length - 1];
+        if (lastGroup && lastGroup.id !== draggingGroupId) {
+          targetId = lastGroup.id;
+        }
+      }
+
+      groupDropTargetRef.current = targetId;
       setGroupDropTarget(targetId);
     },
-    [draggingGroupId],
+    [draggingGroupId, groups],
   );
 
   const handleGroupDrop = useCallback(() => {
-    if (!draggingGroupId || !groupDropTarget || draggingGroupId === groupDropTarget) {
+    const dropTarget = groupDropTargetRef.current;
+    if (!draggingGroupId || !dropTarget || draggingGroupId === dropTarget) {
       setDraggingGroupId(null);
       setGroupDropTarget(null);
       return;
@@ -169,7 +186,7 @@ export function ProjectRail({
     setGroups((prev) => {
       const sorted = [...prev].sort((a, b) => a.order - b.order);
       const dragIdx = sorted.findIndex((g) => g.id === draggingGroupId);
-      const dropIdx = sorted.findIndex((g) => g.id === groupDropTarget);
+      const dropIdx = sorted.findIndex((g) => g.id === dropTarget);
       if (dragIdx === -1 || dropIdx === -1) return prev;
 
       const [removed] = sorted.splice(dragIdx, 1);
@@ -183,7 +200,7 @@ export function ProjectRail({
 
     setDraggingGroupId(null);
     setGroupDropTarget(null);
-  }, [draggingGroupId, groupDropTarget]);
+  }, [draggingGroupId]); // use ref for drop target to avoid stale closure
 
   useEffect(() => {
     if (!draggingGroupId) return;
@@ -591,7 +608,7 @@ export function ProjectRail({
                       background: "none",
                       border: "none",
                       cursor: draggingGroupId ? "grabbing" : "pointer",
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: 600,
                       color: draggingGroupId === group.id ? "var(--text-primary)" : "var(--text-hint)",
                       textTransform: "uppercase",
@@ -608,7 +625,7 @@ export function ProjectRail({
                     }}
                     title={isCollapsed ? "展开分组 (+拖动排序)" : "折叠分组 (+拖动排序)"}
                   >
-                    <span style={{ fontSize: 8, transform: isCollapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s ease" }}>
+                    <span style={{ fontSize: 10, transform: isCollapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s ease" }}>
                       ▶
                     </span>
                     <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -708,7 +725,7 @@ export function ProjectRail({
                   border: "1px dashed var(--border-dim)",
                   background: "transparent",
                   color: "var(--text-hint)",
-                  fontSize: 11.5,
+                  fontSize: 12,
                   cursor: "pointer",
                   textAlign: "center",
                   transition: "border-color 0.15s ease, color 0.15s ease",

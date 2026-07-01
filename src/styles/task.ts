@@ -137,7 +137,7 @@ export const task = {
     outline: "none",
     background: "transparent",
     color: "var(--text-primary)",
-    fontSize: 12.5,
+    fontSize: 13,
   },
   newTaskRow: {
     display: "flex",
@@ -272,14 +272,15 @@ export const task = {
     transition: "background 0.1s",
   },
   taskCardTitle: {
-    fontSize: 12.5,
+    fontSize: 14,
     fontWeight: 500,
     color: "var(--text-primary)",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+    lineHeight: 1.3,
   },
-  taskCardSub: { fontSize: 11, color: "var(--text-muted)", marginTop: 1 },
+  taskCardSub: { fontSize: 12, color: "var(--text-muted)", marginTop: 2 },
   taskDiffStats: {
     display: "inline-flex",
     alignItems: "center",

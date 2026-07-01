@@ -152,7 +152,7 @@ export const RailItem = memo(function RailItem({
         style={{
           flex: 1,
           minWidth: 0,
-          fontSize: 13.5,
+          fontSize: 14,
           fontWeight: isActive ? 600 : 500,
           color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
           overflow: "hidden",
@@ -174,7 +174,7 @@ export const RailItem = memo(function RailItem({
             borderRadius: 9,
             background: "var(--color-danger, #dc2626)",
             color: "#fff",
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: 700,
             display: "inline-flex",
             alignItems: "center",

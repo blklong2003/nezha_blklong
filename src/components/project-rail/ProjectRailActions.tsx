@@ -39,7 +39,7 @@ export function ProjectRailActions({
           cursor: "pointer",
           color: addHov ? "var(--text-primary)" : "var(--text-muted)",
           transition: "background 0.15s ease, color 0.15s ease, transform 0.1s ease",
-          fontSize: 12.5,
+          fontSize: 13,
           fontWeight: 500,
         }}
       >
