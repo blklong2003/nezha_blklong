@@ -185,7 +185,7 @@ export function ProjectPage({
     clearFileAndDiff,
     handleRightResizeStart,
     handleTerminalResizeStart,
-  } = useProjectPanels();
+  } = useProjectPanels(project.id);
 
   const [showShellTerminal, setShowShellTerminal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
