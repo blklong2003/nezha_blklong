@@ -772,7 +772,11 @@ pub async fn discover_project_sessions(project_path: String) -> Result<Vec<serde
     let mut results: Vec<serde_json::Value> = Vec::new();
     let mut seen_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    // 1) Claude 会话: ~/.claude/projects/<encoded>/*.jsonl
+    // 从会话 JSONL 第一行提取项目路径（用于模糊匹配）
+    let project_path_normalized = project_path.replace('\\', "/").to_lowercase();
+
+    // 1) Claude 会话: 先尝试精确编码路径，若无结果则扫描全部项目目录
+    let mut found_claude = false;
     if let Some(claude_dir) = claude_sessions_dir_for_project(&project_path) {
         if let Ok(entries) = std::fs::read_dir(&claude_dir) {
             for entry in entries.flatten() {
@@ -782,11 +786,7 @@ pub async fn discover_project_sessions(project_path: String) -> Result<Vec<serde
                 }
                 if let Some(path_str) = path.to_str() {
                     if seen_paths.insert(path_str.to_string()) {
-                        let session_id = path
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("")
-                            .to_string();
+                        let session_id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
                         let title = extract_session_title(path_str).unwrap_or_else(|| session_id.clone());
                         results.push(serde_json::json!({
                             "type": "claude",
@@ -794,6 +794,47 @@ pub async fn discover_project_sessions(project_path: String) -> Result<Vec<serde
                             "session_id": session_id,
                             "title": title,
                         }));
+                        found_claude = true;
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: 精确路径没找到，扫描 ~/.claude/projects/ 下所有目录，
+    // 通过检查会话内容是否包含项目路径来匹配
+    if !found_claude {
+        if let Some(home) = crate::platform::home_dir() {
+            let projects_root = home.join(".claude").join("projects");
+            if let Ok(dirs) = std::fs::read_dir(&projects_root) {
+                for dir_entry in dirs.flatten() {
+                    if !dir_entry.path().is_dir() {
+                        continue;
+                    }
+                    if let Ok(files) = std::fs::read_dir(dir_entry.path()) {
+                        for file in files.flatten() {
+                            let path = file.path();
+                            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                                continue;
+                            }
+                            if let Some(path_str) = path.to_str() {
+                                if seen_paths.contains(path_str) {
+                                    continue;
+                                }
+                                // 检查会话文件内容是否引用当前项目
+                                if session_belongs_to_project(path_str, &project_path_normalized) {
+                                    seen_paths.insert(path_str.to_string());
+                                    let session_id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                                    let title = extract_session_title(path_str).unwrap_or_else(|| session_id.clone());
+                                    results.push(serde_json::json!({
+                                        "type": "claude",
+                                        "session_path": path_str,
+                                        "session_id": session_id,
+                                        "title": title,
+                                    }));
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -858,6 +899,44 @@ pub async fn discover_project_sessions(project_path: String) -> Result<Vec<serde
     }
 
     Ok(results)
+}
+
+/// 检查 Claude 会话 JSONL 是否属于指定项目（通过 cwd 或项目路径模糊匹配）。
+fn session_belongs_to_project(session_path: &str, project_path_normalized: &str) -> bool {
+    use std::io::BufRead;
+    let file = match File::open(session_path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    let reader = std::io::BufReader::new(file);
+    // 只读前 20 行来快速判断
+    for line in reader.lines().take(20) {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        let lower = line.to_lowercase();
+        // 检查是否包含项目路径中的关键部分（如项目名）
+        // 从项目路径提取最后几段作为关键标识
+        let key_parts: Vec<&str> = project_path_normalized
+            .split('/')
+            .filter(|p| !p.is_empty() && *p != "d:" && p.len() > 2)
+            .collect();
+        // 如果会话中任一行包含项目的最后两段路径，认为匹配
+        if key_parts.len() >= 2 {
+            let last_two = &key_parts[key_parts.len() - 2..];
+            if lower.contains(last_two[last_two.len() - 1]) {
+                return true;
+            }
+        }
+        // 也检查倒数第一段（项目文件夹名）
+        if let Some(project_name) = key_parts.last() {
+            if lower.contains(project_name) && project_name.len() > 3 {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// 从 JSONL 会话文件中提取标题（取第一行 user 消息的摘要或 custom-title）。
