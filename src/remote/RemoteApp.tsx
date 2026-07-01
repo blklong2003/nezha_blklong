@@ -11,6 +11,7 @@ import {
   type RemoteTask,
 } from "./data/remoteSource";
 import { useLiveConversation } from "./hooks/useLiveConversation";
+import { useConversationDraft } from "./hooks/useConversationDraft";
 
 type View =
   | { kind: "projects" }
@@ -254,7 +255,7 @@ function TasksView({
 function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => void }) {
   const { t } = useI18n();
   const { messages, liveTail, loading, error, refresh } = useLiveConversation(task.id, task.status);
-  const [input, setInput] = useState("");
+  const { input, onChange, clear } = useConversationDraft(task.id);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
@@ -299,7 +300,7 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
     setSending(true);
     try {
       await remoteSource.sendInput(task.id, msg);
-      setInput("");
+      clear();
       scrollToBottom();
     } catch {
       /* ignore */
@@ -432,7 +433,7 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
       >
         <input
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") send();
           }}
