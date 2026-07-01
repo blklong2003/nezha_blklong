@@ -10,14 +10,14 @@ export function RightToolbar({
   terminalActive,
   onToggleTerminal,
   onOpenSearch,
-  onOpenSettings,
+  onOpenAppSettings,
 }: {
   activePanel: RightPanel;
   onToggle: (panel: Exclude<RightPanel, null>) => void;
   terminalActive: boolean;
   onToggleTerminal: () => void;
   onOpenSearch: () => void;
-  onOpenSettings: () => void;
+  onOpenAppSettings: () => void;
 }) {
   const { t } = useI18n();
   const buttons: Array<{
@@ -31,7 +31,7 @@ export function RightToolbar({
   ];
 
   const footerItems = [
-    { icon: <Settings size={17} />, title: t("settings.title"), disabled: false, onClick: onOpenSettings },
+    { icon: <Settings size={17} />, title: t("settings.title"), disabled: false, onClick: onOpenAppSettings },
   ];
 
   return (

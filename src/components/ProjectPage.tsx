@@ -22,7 +22,7 @@ import { GitChanges } from "./GitChanges";
 import { GitHistory } from "./GitHistory";
 import { GitDiffViewer } from "./GitDiffViewer";
 import { ProjectRail } from "./ProjectRail";
-import { SettingsDialog } from "./SettingsDialog";
+import { AppSettingsDialog } from "./AppSettingsDialog";
 import { RightToolbar } from "./RightToolbar";
 import { TodoTaskView } from "./TodoTaskView";
 import { ShellTerminalPanel, type ShellTerminalPanelHandle } from "./ShellTerminalPanel";
@@ -598,7 +598,7 @@ export function ProjectPage({
         terminalActive={showShellTerminal}
         onToggleTerminal={() => setShowShellTerminal((v) => !v)}
         onOpenSearch={() => setShowFileSearch(true)}
-        onOpenSettings={() => setShowSettings(true)}
+        onOpenAppSettings={() => setShowSettings(true)}
       />
 
       {showFileSearch && (
@@ -610,7 +610,25 @@ export function ProjectPage({
       )}
 
       {showSettings && (
-        <SettingsDialog projectPath={project.path} onClose={() => setShowSettings(false)} />
+        <AppSettingsDialog
+          onClose={() => setShowSettings(false)}
+          themeVariant={themeVariant}
+          themeMode={themeMode}
+          systemPrefersDark={systemPrefersDark}
+          onThemeModeChange={onThemeModeChange}
+          terminalFontSize={terminalFontSize}
+          onTerminalFontSizeChange={onTerminalFontSizeChange}
+          taskDisplayWindow={taskDisplayWindow}
+          onTaskDisplayWindowChange={onTaskDisplayWindowChange}
+          attentionBadge={attentionBadge}
+          onAttentionBadgeChange={onAttentionBadgeChange}
+          terminalScrollback={terminalScrollback}
+          onTerminalScrollbackChange={onTerminalScrollbackChange}
+          uiFontFamily={uiFontFamily}
+          onUiFontFamilyChange={onUiFontFamilyChange}
+          monoFontFamily={monoFontFamily}
+          onMonoFontFamilyChange={onMonoFontFamilyChange}
+        />
       )}
     </div>
   );
