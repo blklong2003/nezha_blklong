@@ -1,3 +1,4 @@
+use serde_json::Value;
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, BufWriter, Read, Seek, SeekFrom, Write};
@@ -717,7 +718,7 @@ pub async fn read_session_messages(session_path: String) -> Result<Vec<SessionMe
 /// 删除单个任务的会话 JSONL 文件（由前端任务删除时调用）。
 #[tauri::command]
 pub async fn delete_session_file(task_id: String) -> Result<(), String> {
-    let dir = nezha_data_dir().ok_or("no data dir")?;
+    let dir = crate::feishu::nezha_data_dir().ok_or("no data dir")?;
     let projects: Vec<Value> = std::fs::read_to_string(dir.join("projects.json"))
         .ok()
         .and_then(|c| serde_json::from_str(&c).ok())
@@ -725,7 +726,7 @@ pub async fn delete_session_file(task_id: String) -> Result<(), String> {
 
     for project in &projects {
         let Some(pid) = project["id"].as_str() else { continue };
-        if !is_safe_id(pid) { continue; }
+        if !crate::feishu::is_safe_id(pid) { continue; }
         let tasks_path = dir.join("projects").join(pid).join("tasks.json");
         let tasks: Vec<Value> = std::fs::read_to_string(&tasks_path)
             .ok()
@@ -747,7 +748,7 @@ pub async fn delete_session_file(task_id: String) -> Result<(), String> {
 /// 删除某项目下所有任务的会话 JSONL 文件（由前端删除项目时调用）。
 #[tauri::command]
 pub async fn delete_project_sessions(project_id: String) -> Result<(), String> {
-    let dir = nezha_data_dir().ok_or("no data dir")?;
+    let dir = crate::feishu::nezha_data_dir().ok_or("no data dir")?;
     let tasks_path = dir.join("projects").join(&project_id).join("tasks.json");
     let tasks: Vec<Value> = std::fs::read_to_string(&tasks_path)
         .ok()

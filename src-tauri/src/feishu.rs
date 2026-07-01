@@ -544,7 +544,7 @@ fn check_auth(cfg: &BotConfig, headers: &str, query: &str) -> bool {
 
 /// Returns the NeZha data directory (~/.nezha/) — same root storage.rs uses.
 /// This is the ONLY correct path for reading projects/tasks.
-fn nezha_data_dir() -> Option<std::path::PathBuf> {
+pub(crate) fn nezha_data_dir() -> Option<std::path::PathBuf> {
     crate::storage::nezha_dir().ok()
 }
 
@@ -938,7 +938,7 @@ fn short_id(id: &str) -> &str {
     }
 }
 
-fn is_safe_id(id: &str) -> bool {
+pub(crate) fn is_safe_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && !id.contains('/')
