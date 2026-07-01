@@ -18,16 +18,16 @@ type View =
   | { kind: "tasks"; project: RemoteProject }
   | { kind: "conversation"; project: RemoteProject; task: RemoteTask };
 
-const STATUS_COLOR: Record<string, string> = {
-  running: "#4ade80",
-  input_required: "#fbbf24",
-  pending: "#60a5fa",
-  todo: "#52525b",
-  done: "#22c55e",
-  failed: "#ef4444",
-  cancelled: "#52525b",
-  detached: "#fbbf24",
-  interrupted: "#fbbf24",
+const STATUS_ICON: Record<string, string> = {
+  running: "▶",
+  pending: "◐",
+  input_required: "⚠",
+  detached: "⊘",
+  interrupted: "⚠",
+  done: "✓",
+  failed: "✕",
+  cancelled: "○",
+  todo: "○",
 };
 
 function taskTitle(task: RemoteTask): string {
@@ -98,13 +98,17 @@ function StatusDot({ status }: { status: string }) {
   return (
     <span
       style={{
-        width: 9,
-        height: 9,
-        borderRadius: "50%",
+        width: 14,
+        height: 14,
+        fontSize: 11,
+        lineHeight: "14px",
+        textAlign: "center",
         flexShrink: 0,
-        background: STATUS_COLOR[status] ?? "#52525b",
       }}
-    />
+      title={status}
+    >
+      {STATUS_ICON[status] ?? "○"}
+    </span>
   );
 }
 
@@ -246,7 +250,11 @@ function TasksView({
               <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {taskTitle(task)}
               </div>
-              <div style={{ fontSize: 12, color: "var(--text-hint)" }}>{task.agent}</div>
+              <div style={{ fontSize: 11, color: "var(--text-hint)", display: "flex", gap: 4, alignItems: "center" }}>
+                <span>{task.agent}</span>
+                <span>·</span>
+                <span>{t(`conversation.status.${task.status}`)}</span>
+              </div>
             </div>
           </button>
         ))}

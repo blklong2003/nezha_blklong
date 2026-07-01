@@ -1,36 +1,54 @@
 import {
   CheckCircle2,
   XCircle,
-  MinusCircle,
   Circle,
   Loader2,
-  AlertCircle,
   AlertTriangle,
+  WifiOff,
+  CircleDot,
 } from "lucide-react";
 import type { TaskStatus } from "../types";
 
+export const STATUS_ICON_SIZE = 14;
+
 export function StatusIcon({ status }: { status: TaskStatus }) {
+  const iconStyle = (opacity?: number) => opacity !== undefined ? { opacity } : {};
   switch (status) {
     case "running":
-      return (
-        <Loader2
-          size={14}
-          style={{ animation: "spin 1s linear infinite", color: "var(--text-muted)" }}
-        />
-      );
+      return <Loader2 size={STATUS_ICON_SIZE} style={{ animation: "spin 1.2s linear infinite" }} />;
+    case "pending":
+      return <CircleDot size={STATUS_ICON_SIZE} style={iconStyle(0.7)} />;
     case "input_required":
-      return <AlertCircle size={14} style={{ color: "var(--warning)" }} />;
+      return <AlertTriangle size={STATUS_ICON_SIZE} />;
     case "detached":
-      return <AlertTriangle size={14} style={{ color: "var(--warning)" }} />;
+      return <WifiOff size={STATUS_ICON_SIZE} />;
     case "interrupted":
-      return <AlertTriangle size={14} style={{ color: "var(--warning)" }} />;
+      return <AlertTriangle size={STATUS_ICON_SIZE} />;
     case "done":
-      return <CheckCircle2 size={14} style={{ color: "var(--success)" }} />;
+      return <CheckCircle2 size={STATUS_ICON_SIZE} />;
     case "failed":
-      return <XCircle size={14} style={{ color: "var(--danger)" }} />;
+      return <XCircle size={STATUS_ICON_SIZE} />;
     case "cancelled":
-      return <MinusCircle size={14} style={{ color: "var(--text-hint)" }} />;
+      return <Circle size={STATUS_ICON_SIZE} style={iconStyle(0.4)} />;
+    case "todo":
+      return <Circle size={STATUS_ICON_SIZE} style={iconStyle(0.5)} />;
     default:
-      return <Circle size={14} style={{ color: "var(--text-hint)" }} />;
+      return <Circle size={STATUS_ICON_SIZE} style={iconStyle(0.3)} />;
   }
+}
+
+/** 获取状态的文字描述（支持 i18n key 查找）。 */
+export function statusLabelKey(status: TaskStatus): string {
+  const keyMap: Record<TaskStatus, string> = {
+    running: "status.running",
+    pending: "status.pending",
+    input_required: "status.inputRequired",
+    detached: "status.detached",
+    interrupted: "status.interrupted",
+    done: "status.done",
+    failed: "status.failed",
+    cancelled: "status.cancelled",
+    todo: "status.todo",
+  };
+  return keyMap[status] || status;
 }

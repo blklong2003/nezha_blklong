@@ -1,17 +1,6 @@
 import type { Task } from "../../types";
 import { useI18n } from "../../i18n";
-
-const STATUS_COLOR: Record<string, string> = {
-  running: "#4ade80",
-  input_required: "#fbbf24",
-  pending: "#60a5fa",
-  todo: "#52525b",
-  done: "#22c55e",
-  failed: "#ef4444",
-  cancelled: "#52525b",
-  detached: "#fbbf24",
-  interrupted: "#fbbf24",
-};
+import { StatusIcon, statusLabelKey } from "../StatusIcon";
 
 function formatTimeAgo(ts: number, t: (key: string, params?: Record<string, string | number>) => string): string {
   const diff = Date.now() - ts;
@@ -38,10 +27,8 @@ export function ConversationRow({
   onClick: () => void;
 }) {
   const { t } = useI18n();
-  const color = STATUS_COLOR[task.status] ?? "#52525b";
   const title = getTaskTitle(task, t);
   const time = formatTimeAgo(task.updatedAt ?? task.createdAt, t);
-  const statusLabel = t(`conversation.status.${task.status}`);
 
   return (
     <button
@@ -86,17 +73,8 @@ export function ConversationRow({
           }}
         />
       )}
-      {/* status dot */}
-      <span
-        style={{
-          width: 7,
-          height: 7,
-          borderRadius: "50%",
-          flexShrink: 0,
-          background: color,
-          boxShadow: isActive ? `0 0 6px ${color}` : "none",
-        }}
-      />
+      {/* status icon */}
+      <StatusIcon status={task.status} />
       {/* content */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
@@ -126,8 +104,8 @@ export function ConversationRow({
           }}
         >
           <span>{task.agent}</span>
-          <span>·</span>
-          <span>{statusLabel}</span>
+          <span style={{ opacity: 0.5 }}>·</span>
+          <span>{t(statusLabelKey(task.status as any))}</span>
           <span style={{ marginLeft: "auto" }}>{time}</span>
         </div>
       </div>
