@@ -152,10 +152,11 @@ interface ProjectViewState {
   selectedTaskId: string | null;
   isNewTask: boolean;
   taskPanelCollapsed: boolean;
+  hideBranchBar: boolean;
 }
 
 function createDefaultProjectViewState(): ProjectViewState {
-  return { selectedTaskId: null, isNewTask: true, taskPanelCollapsed: false };
+  return { selectedTaskId: null, isNewTask: true, taskPanelCollapsed: false, hideBranchBar: false };
 }
 
 // 跨项目保留的新任务草稿 (projectId → draft)
@@ -1471,6 +1472,7 @@ function App() {
               onTaskPanelCollapsedChange={(collapsed) =>
                 updateProjectView(project.id, { taskPanelCollapsed: collapsed })
               }
+              branchBarHidden={getProjectView(project.id).hideBranchBar}
               themeVariant={themeVariant}
               themeMode={themeMode}
               systemPrefersDark={systemPrefersDark}

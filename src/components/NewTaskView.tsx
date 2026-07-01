@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { TriangleAlert, Sparkles } from "lucide-react";
+import { TriangleAlert, Sparkles, ChevronDown } from "lucide-react";
 import type { Project, AgentType, PermissionMode } from "../types";
 import type { HookAgentReadiness } from "./app-settings/types";
 import { useToast } from "./Toast";
@@ -72,6 +72,7 @@ export function NewTaskView({
   onSubmit,
   initialDraft,
   onCacheDraft,
+  onSwitchProject,
 }: {
   project: Project;
   otherProjects?: Project[];
@@ -88,6 +89,7 @@ export function NewTaskView({
   }) => void;
   initialDraft?: NewTaskDraft | null;
   onCacheDraft?: (draft: NewTaskDraft | null) => void;
+  onSwitchProject?: (project: Project) => void,
 }) {
   const { t } = useI18n();
   const { showToast } = useToast();
@@ -423,6 +425,8 @@ export function NewTaskView({
     }
   }
 
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
+
   return (
     <div style={s.newTaskOuter}>
       {/* Header */}
@@ -433,6 +437,87 @@ export function NewTaskView({
           style={s.newTaskClaudeGif}
         />
         <span style={s.newTaskTitle}>{t("newTask.title")}</span>
+        {/* Project switcher */}
+        {otherProjects && otherProjects.length > 0 && (
+          <div style={{ position: "relative", marginLeft: "auto" }}>
+            <button
+              onClick={() => setShowProjectPicker((v) => !v)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid var(--border-dim)",
+                background: "var(--bg-card)",
+                color: "var(--text-secondary)",
+                fontSize: 12,
+                cursor: "pointer",
+                maxWidth: 160,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={project.name}
+            >
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {project.name}
+              </span>
+              <ChevronDown size={12} style={{ flexShrink: 0 }} />
+            </button>
+            {showProjectPicker && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  marginTop: 4,
+                  minWidth: 180,
+                  maxWidth: 280,
+                  maxHeight: 300,
+                  overflowY: "auto",
+                  background: "var(--bg-panel)",
+                  border: "1px solid var(--border-dim)",
+                  borderRadius: 8,
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+                  zIndex: 100,
+                }}
+              >
+                {[project, ...otherProjects].map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      setShowProjectPicker(false);
+                      if (p.id !== project.id) {
+                        onSwitchProject?.(p);
+                      }
+                    }}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 12px",
+                      border: "none",
+                      background: p.id === project.id ? "var(--accent-subtle)" : "none",
+                      color: "var(--text-primary)",
+                      fontSize: 12.5,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Missing context file warning */}

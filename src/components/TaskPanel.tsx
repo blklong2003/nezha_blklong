@@ -59,6 +59,7 @@ export function TaskPanel({
   active = true,
   collapsed = false,
   onToggleCollapsed,
+  hideBranchBar = false,
 }: {
   project: Project;
   tasks: Task[];
@@ -92,6 +93,7 @@ export function TaskPanel({
   active?: boolean;
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
+  hideBranchBar?: boolean;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -173,8 +175,8 @@ export function TaskPanel({
         />
       </div>
 
-      {/* Branch bar */}
-      <BranchBar projectPath={project.path} active={active} />
+      {/* Branch bar — hideable */}
+      {!hideBranchBar && <BranchBar projectPath={project.path} active={active} />}
 
       {/* New Task row */}
       <button

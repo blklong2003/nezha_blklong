@@ -71,6 +71,7 @@ export function ProjectPage({
   getNewTaskDraft,
   taskPanelCollapsed,
   onTaskPanelCollapsedChange,
+  branchBarHidden,
   themeVariant,
   themeMode,
   systemPrefersDark,
@@ -149,6 +150,7 @@ export function ProjectPage({
   getNewTaskDraft: (projectId: string) => any;
   taskPanelCollapsed?: boolean;
   onTaskPanelCollapsedChange?: (collapsed: boolean) => void;
+  branchBarHidden?: boolean;
   themeVariant: ThemeVariant;
   themeMode: ThemeMode;
   systemPrefersDark: boolean;
@@ -385,6 +387,7 @@ export function ProjectPage({
         active={visible}
         collapsed={taskPanelCollapsed}
         onToggleCollapsed={() => setTaskPanelCollapsed((v) => !v)}
+        hideBranchBar={branchBarHidden}
       />
       <div style={{ ...s.mainContent, flexDirection: "column" }}>
         <div
@@ -474,6 +477,14 @@ export function ProjectPage({
                   newTaskDraftRef.current = draft;
                   saveNewTaskDraft(project.id, draft);
                   handleCacheNewTaskDraft(draft);
+                }}
+                onSwitchProject={(p) => {
+                  // 保存当前草稿后切换项目
+                  if (newTaskDraftRef.current) {
+                    saveNewTaskDraft(project.id, newTaskDraftRef.current);
+                  }
+                  onSelectTask(""); // 切回新建状态
+                  onSwitchProject(p);
                 }}
               />
             ) : selectedTask.status === ("todo" as TaskStatus) ? (
