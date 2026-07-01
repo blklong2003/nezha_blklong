@@ -1,5 +1,6 @@
 import { useCallback, useState, useEffect, useMemo, useRef } from "react";
-import type { Project, Task } from "../types";
+import { invoke } from "@tauri-apps/api/core";
+import type { Project, Task, ProjectGroup } from "../types";
 import { ProjectAvatar } from "./ProjectAvatar";
 import {
   RAIL_ITEM_STRIDE,
@@ -19,7 +20,6 @@ import {
   RAIL_SUPPRESS_CLICK_MS,
   type DragOrigin,
   type DragViz,
-  getRailItemTranslateY,
 } from "./project-rail/drag";
 
 export { projectMatchesRailSearch } from "./project-rail/search";
@@ -47,6 +47,101 @@ export function ProjectRail({
   onOpen: () => void;
   singleProjectMode?: boolean;
 }) {
+  // 项目分组状态
+  const [groups, setGroups] = useState<ProjectGroup[]>([]);
+  const [groupCollapsed, setGroupCollapsed] = useState<Record<string, boolean>>({});
+  const [showNewGroup, setShowNewGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+
+  // 加载分组数据
+  useEffect(() => {
+    invoke<ProjectGroup[]>("load_project_groups")
+      .then((g) => {
+        setGroups(g);
+        // 初始化折叠状态
+        const collapsed: Record<string, boolean> = {};
+        g.forEach((grp) => {
+          collapsed[grp.id] = grp.collapsed;
+        });
+        setGroupCollapsed(collapsed);
+      })
+      .catch(() => {});
+  }, []);
+
+  // 保存分组折叠状态
+  const saveGroupCollapsed = useCallback(
+    (groupId: string, collapsed: boolean) => {
+      setGroups((prev) =>
+        prev.map((g) => (g.id === groupId ? { ...g, collapsed } : g)),
+      );
+      // 同步到后端（防抖由 useEffect 或手动触发处理）
+      invoke("save_project_groups", {
+        groups: groups.map((g) => (g.id === groupId ? { ...g, collapsed } : g)),
+      }).catch(() => {});
+    },
+    [groups],
+  );
+
+  // 切换分组折叠
+  const toggleGroup = useCallback(
+    (groupId: string) => {
+      setGroupCollapsed((prev) => {
+        const next = { ...prev, [groupId]: !prev[groupId] };
+        saveGroupCollapsed(groupId, next[groupId]);
+        return next;
+      });
+    },
+    [saveGroupCollapsed],
+  );
+
+  // 创建新分组
+  const createGroup = useCallback(
+    (name: string) => {
+      if (!name.trim()) return;
+      const newGroup: ProjectGroup = {
+        id: `grp_${Date.now()}`,
+        name: name.trim(),
+        collapsed: false,
+        order: groups.length,
+      };
+      const nextGroups = [...groups, newGroup];
+      setGroups(nextGroups);
+      invoke("save_project_groups", { groups: nextGroups }).catch(() => {});
+      setNewGroupName("");
+      setShowNewGroup(false);
+    },
+    [groups],
+  );
+
+  // 按分组整理项目
+  const groupedProjects = useMemo(() => {
+    const result: { group: ProjectGroup | null; projects: Project[] }[] = [];
+    const grouped = new Map<string, Project[]>();
+
+    // 将项目分配到各分组
+    projects.forEach((p) => {
+      const gid = p.groupId;
+      if (gid) {
+        const arr = grouped.get(gid) ?? [];
+        arr.push(p);
+        grouped.set(gid, arr);
+      }
+    });
+
+    // 按分组顺序添加
+    const sortedGroups = [...groups].sort((a, b) => a.order - b.order);
+    sortedGroups.forEach((g) => {
+      result.push({ group: g, projects: grouped.get(g.id) ?? [] });
+    });
+
+    // 未分组项目
+    const ungrouped = projects.filter((p) => !p.groupId);
+    if (ungrouped.length > 0) {
+      result.push({ group: null, projects: ungrouped });
+    }
+
+    return result;
+  }, [projects, groups]);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   // 竖条只显示常驻项目；当前激活项目即使被设为非常驻也始终保留，避免失去当前上下文。
@@ -338,56 +433,153 @@ export function ProjectRail({
         transition: isResizing ? "none" : "width 0.1s ease",
       }}
     >
-      {/* Scrollable project list */}
+      {/* Scrollable grouped project list */}
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", minHeight: 0, position: "relative" }}>
-        {railProjects.map((project, index) => {
-          const isDragging = dragOrigin?.draggedId === project.id;
-          const activity = getProjectActivity(projectActivityById, project.id);
-          const translateY =
-            dragOrigin && dragViz && draggedVisibleIndex !== -1
-              ? getRailItemTranslateY(index, draggedVisibleIndex, dragViz.dropIndex)
-              : 0;
-          // 显示拖拽插入指示器
-          const showDropIndicator = dragViz && dragOrigin && index === dragViz.dropIndex && dragOrigin.draggedId !== project.id;
+        {groupedProjects.map(({ group, projects: groupProjects }) => {
+          const isCollapsed = group ? groupCollapsed[group.id] ?? false : false;
           return (
-            <div key={project.id}>
-              {showDropIndicator && (
-                <div
+            <div key={group?.id ?? "__ungrouped__"}>
+              {/* 分组头 */}
+              {group && (
+                <button
+                  onClick={() => toggleGroup(group.id)}
                   style={{
-                    height: 2,
-                    margin: "2px 12px",
-                    borderRadius: 1,
-                    background: "var(--accent, #4ade80)",
-                    transition: "all 0.15s ease",
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "6px 14px 4px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "var(--text-hint)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    textAlign: "left",
+                    transition: "color 0.15s ease",
                   }}
-                />
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-hint)")}
+                  title={isCollapsed ? "展开分组" : "折叠分组"}
+                >
+                  <span style={{ fontSize: 8, transform: isCollapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s ease" }}>
+                    ▶
+                  </span>
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {group.name}
+                  </span>
+                  <span style={{ opacity: 0.6 }}>({groupProjects.length})</span>
+                </button>
               )}
-              <RailItem
-                project={project}
-                isActive={project.id === activeProjectId}
-                status={activity.status}
-                attentionCount={activity.attentionCount}
-                showBadge={attentionBadge}
-                waveNonce={waveNonces.get(project.id) ?? 0}
-                isDragging={isDragging}
-                translateY={translateY}
-                onPointerDown={handleRailItemPointerDown}
-                onClick={handleRailItemClick}
-              />
+              {/* 分组项目（折叠时隐藏） */}
+              {!isCollapsed &&
+                groupProjects.map((project) => {
+                  const isDragging = dragOrigin?.draggedId === project.id;
+                  const activity = getProjectActivity(projectActivityById, project.id);
+                  return (
+                    <RailItem
+                      key={project.id}
+                      project={project}
+                      isActive={project.id === activeProjectId}
+                      status={activity.status}
+                      attentionCount={activity.attentionCount}
+                      showBadge={attentionBadge}
+                      waveNonce={waveNonces.get(project.id) ?? 0}
+                      isDragging={isDragging}
+                      translateY={0}
+                      onPointerDown={handleRailItemPointerDown}
+                      onClick={handleRailItemClick}
+                    />
+                  );
+                })}
             </div>
           );
         })}
-        {/* 底部插入指示器 */}
-        {dragViz && dragOrigin && dragViz.dropIndex >= railProjects.length && (
-          <div
-            style={{
-              height: 2,
-              margin: "2px 12px",
-              borderRadius: 1,
-              background: "var(--accent, #4ade80)",
-              transition: "all 0.15s ease",
-            }}
-          />
+
+        {/* 新建分组 / 折叠全部 按钮 */}
+        {!singleProjectMode && (
+          <div style={{ padding: "8px 14px" }}>
+            {showNewGroup ? (
+              <div style={{ display: "flex", gap: 4 }}>
+                <input
+                  autoFocus
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") createGroup(newGroupName);
+                    if (e.key === "Escape") { setShowNewGroup(false); setNewGroupName(""); }
+                  }}
+                  placeholder="分组名称..."
+                  style={{
+                    flex: 1,
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    border: "1px solid var(--border-dim)",
+                    background: "var(--bg-input)",
+                    color: "var(--text-primary)",
+                    fontSize: 12,
+                    outline: "none",
+                  }}
+                />
+                <button
+                  onClick={() => createGroup(newGroupName)}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    border: "none",
+                    background: "var(--accent, #4ade80)",
+                    color: "#fff",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  ✓
+                </button>
+                <button
+                  onClick={() => { setShowNewGroup(false); setNewGroupName(""); }}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                    border: "1px solid var(--border-dim)",
+                    background: "transparent",
+                    color: "var(--text-muted)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowNewGroup(true)}
+                style={{
+                  width: "100%",
+                  padding: "6px 8px",
+                  borderRadius: 6,
+                  border: "1px dashed var(--border-dim)",
+                  background: "transparent",
+                  color: "var(--text-hint)",
+                  fontSize: 11.5,
+                  cursor: "pointer",
+                  textAlign: "center",
+                  transition: "border-color 0.15s ease, color 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent, #4ade80)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--accent, #4ade80)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-dim)";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--text-hint)";
+                }}
+              >
+                + 新建分组
+              </button>
+            )}
+          </div>
         )}
       </div>
 

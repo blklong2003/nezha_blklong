@@ -274,6 +274,8 @@ pub fn run() {
             config::write_agent_config_file,
             storage::load_projects,
             storage::save_projects,
+            storage::load_project_groups,
+            storage::save_project_groups,
             storage::load_project_tasks,
             storage::save_project_tasks,
             app_settings::load_app_settings,

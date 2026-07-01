@@ -6,6 +6,15 @@ export interface Project {
   lastOpenedAt: number;
   /** 为 true 时不在左侧常驻竖条显示，仅可从首页或「展开全部」抽屉访问。缺省=常驻。 */
   hiddenFromRail?: boolean;
+  /** 项目分组 ID。未分组时为 undefined。 */
+  groupId?: string;
+}
+
+export interface ProjectGroup {
+  id: string;
+  name: string;
+  collapsed: boolean;
+  order: number;
 }
 
 export type AgentType = "claude" | "codex";

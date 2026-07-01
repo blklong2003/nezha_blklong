@@ -21,6 +21,20 @@ pub struct Project {
         skip_serializing_if = "std::ops::Not::not"
     )]
     pub hidden_from_rail: bool,
+    /// 项目分组 ID。未分组时为 null/不设置。
+    #[serde(rename = "groupId", default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
+}
+
+/// 项目分组：用于在侧边栏中对项目进行分组管理。
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ProjectGroup {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub collapsed: bool,
+    #[serde(default)]
+    pub order: i32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -111,6 +125,29 @@ pub fn save_projects(projects: Vec<Project>) -> Result<(), String> {
     ensure_nezha_dirs()?;
     let raw = serde_json::to_string_pretty(&projects).map_err(|e| e.to_string())?;
     atomic_write(&projects_path()?, &raw)
+}
+
+// ── Project Groups ───────────────────────────────────────────────────────────
+
+fn groups_path() -> Result<PathBuf, String> {
+    Ok(nezha_dir()?.join("project-groups.json"))
+}
+
+#[tauri::command]
+pub fn load_project_groups() -> Result<Vec<ProjectGroup>, String> {
+    let path = groups_path()?;
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+    let raw = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&raw).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_project_groups(groups: Vec<ProjectGroup>) -> Result<(), String> {
+    ensure_nezha_dirs()?;
+    let raw = serde_json::to_string_pretty(&groups).map_err(|e| e.to_string())?;
+    atomic_write(&groups_path()?, &raw)
 }
 
 #[tauri::command]
