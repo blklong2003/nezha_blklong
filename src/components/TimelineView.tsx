@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Clock } from "lucide-react";
 import type { Project, Task } from "../types";
 import { ProjectAvatar } from "./ProjectAvatar";
@@ -41,25 +41,37 @@ function formatTime(ts: number): string {
   return `${hh}:${mm}`;
 }
 
-function taskTitle(task: Task): string {
+function taskTitle(task: Task, t: (key: string) => string): string {
   if (task.name && task.name.trim()) return task.name;
   const prompt = task.prompt.trim();
-  return prompt.length > 0 ? prompt.split("\n")[0] : "(untitled)";
+  return prompt.length > 0 ? prompt.split("\n")[0] : t("timeline.untitled");
 }
 
 function TimelineRow({ task, onClick }: { task: Task; onClick: () => void }) {
+  const { t } = useI18n();
   const additions = task.additions ?? 0;
   const deletions = task.deletions ?? 0;
   const hasDiff = additions > 0 || deletions > 0;
+  const [hov, setHov] = useState(false);
 
   return (
-    <button type="button" style={s.timelineRow} onClick={onClick}>
+    <button
+      type="button"
+      style={{
+        ...s.timelineRow,
+        background: hov ? "var(--bg-hover)" : "transparent",
+        transition: "background 0.12s ease",
+      }}
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+    >
       <span style={s.timelineRowTime}>{formatTime(task.createdAt)}</span>
       <span style={s.timelineRowStatus}>
         <StatusIcon status={task.status} />
       </span>
       <div style={s.timelineRowMain}>
-        <div style={s.timelineRowTitle}>{taskTitle(task)}</div>
+        <div style={s.timelineRowTitle}>{taskTitle(task, t)}</div>
         <div style={s.timelineRowMeta}>
           <span>{task.agent}</span>
           {hasDiff ? (

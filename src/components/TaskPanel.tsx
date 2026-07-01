@@ -97,6 +97,7 @@ export function TaskPanel({
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const isDark = themeVariant === "dark" || themeVariant === "midnight";
   const hasAttention = tasks.some(
     (t) => t.status === "input_required" || t.status === "detached" || t.status === "interrupted",
@@ -165,13 +166,22 @@ export function TaskPanel({
       </div>
 
       {/* Search */}
-      <div style={s.panelSearchWrap}>
-        <Search size={13} strokeWidth={2} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+      <div
+        style={{
+          ...s.panelSearchWrap,
+          borderColor: searchFocused ? "var(--accent, #4ade80)" : "var(--border-dim)",
+          boxShadow: searchFocused ? "0 0 0 2px color-mix(in srgb, var(--accent, #4ade80) 20%, transparent)" : "none",
+          transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+        }}
+      >
+        <Search size={13} strokeWidth={2} color={searchFocused ? "var(--accent, #4ade80)" : "var(--text-muted)"} style={{ flexShrink: 0, transition: "color 0.15s ease" }} />
         <input
           style={s.panelSearchInput}
           placeholder={t("task.searchTasks")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
         />
       </div>
 

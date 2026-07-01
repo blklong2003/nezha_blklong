@@ -63,26 +63,43 @@ export function SidebarFooterActions({
     return () => window.removeEventListener(OPEN_APP_SETTINGS_EVENT, open);
   }, []);
 
+  const [settingsHov, setSettingsHov] = useState(false);
+  const [themeHov, setThemeHov] = useState(false);
+
   return (
     <>
       <div style={s.sidebarFooterActions}>
         <NotificationBell />
         <button
-          style={s.sidebarIconBtn}
+          style={{
+            ...s.sidebarIconBtn,
+            background: settingsHov ? "var(--bg-hover)" : "none",
+            opacity: settingsHov ? 0.8 : 0.5,
+            transition: "background 0.15s ease, opacity 0.15s ease",
+          }}
           title={t("appSettings.title")}
           onClick={() => setShowAppSettings(true)}
+          onMouseEnter={() => setSettingsHov(true)}
+          onMouseLeave={() => setSettingsHov(false)}
         >
-          <Settings size={14} strokeWidth={1.6} color="var(--text-hint)" />
+          <Settings size={14} strokeWidth={1.6} color="var(--text-muted)" />
         </button>
         <button
-          style={s.sidebarIconBtn}
+          style={{
+            ...s.sidebarIconBtn,
+            background: themeHov ? "var(--bg-hover)" : "none",
+            opacity: themeHov ? 0.8 : 0.5,
+            transition: "background 0.15s ease, opacity 0.15s ease",
+          }}
           title={isDark ? t("theme.switchToLight") : t("theme.switchToDark")}
           onClick={onToggleTheme}
+          onMouseEnter={() => setThemeHov(true)}
+          onMouseLeave={() => setThemeHov(false)}
         >
           {isDark ? (
-            <Sun size={14} strokeWidth={1.8} color="var(--text-hint)" />
+            <Sun size={14} strokeWidth={1.8} color="var(--text-muted)" />
           ) : (
-            <Moon size={14} strokeWidth={1.8} color="var(--text-hint)" />
+            <Moon size={14} strokeWidth={1.8} color="var(--text-muted)" />
           )}
         </button>
         {ENABLE_USAGE_INSIGHTS ? <UsagePopover /> : null}

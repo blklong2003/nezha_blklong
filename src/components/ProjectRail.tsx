@@ -299,7 +299,7 @@ export function ProjectRail({
       }}
     >
       {/* Scrollable project list */}
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", minHeight: 0 }}>
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", minHeight: 0, position: "relative" }}>
         {railProjects.map((project, index) => {
           const isDragging = dragOrigin?.draggedId === project.id;
           const activity = getProjectActivity(projectActivityById, project.id);
@@ -307,22 +307,48 @@ export function ProjectRail({
             dragOrigin && dragViz && draggedVisibleIndex !== -1
               ? getRailItemTranslateY(index, draggedVisibleIndex, dragViz.dropIndex)
               : 0;
+          // 显示拖拽插入指示器
+          const showDropIndicator = dragViz && dragOrigin && index === dragViz.dropIndex && dragOrigin.draggedId !== project.id;
           return (
-            <RailItem
-              key={project.id}
-              project={project}
-              isActive={project.id === activeProjectId}
-              status={activity.status}
-              attentionCount={activity.attentionCount}
-              showBadge={attentionBadge}
-              waveNonce={waveNonces.get(project.id) ?? 0}
-              isDragging={isDragging}
-              translateY={translateY}
-              onPointerDown={handleRailItemPointerDown}
-              onClick={handleRailItemClick}
-            />
+            <div key={project.id}>
+              {showDropIndicator && (
+                <div
+                  style={{
+                    height: 2,
+                    margin: "2px 12px",
+                    borderRadius: 1,
+                    background: "var(--accent, #4ade80)",
+                    transition: "all 0.15s ease",
+                  }}
+                />
+              )}
+              <RailItem
+                project={project}
+                isActive={project.id === activeProjectId}
+                status={activity.status}
+                attentionCount={activity.attentionCount}
+                showBadge={attentionBadge}
+                waveNonce={waveNonces.get(project.id) ?? 0}
+                isDragging={isDragging}
+                translateY={translateY}
+                onPointerDown={handleRailItemPointerDown}
+                onClick={handleRailItemClick}
+              />
+            </div>
           );
         })}
+        {/* 底部插入指示器 */}
+        {dragViz && dragOrigin && dragViz.dropIndex >= railProjects.length && (
+          <div
+            style={{
+              height: 2,
+              margin: "2px 12px",
+              borderRadius: 1,
+              background: "var(--accent, #4ade80)",
+              transition: "all 0.15s ease",
+            }}
+          />
+        )}
       </div>
 
       {!singleProjectMode && (

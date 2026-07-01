@@ -334,12 +334,13 @@ export function RunningView({
                 fontSize: 14,
                 fontWeight: 600,
                 color: "var(--text-primary)",
-                background: "transparent",
-                border: "none",
-                borderBottom: "2px solid var(--border-strong)",
-                borderRadius: 0,
-                padding: "0 2px",
+                background: "var(--bg-input)",
+                border: "2px solid var(--accent, #4ade80)",
+                borderRadius: 6,
+                padding: "2px 8px",
                 outline: "none",
+                boxShadow: "0 0 0 3px color-mix(in srgb, var(--accent, #4ade80) 15%, transparent)",
+                transition: "border-color 0.15s ease, box-shadow 0.15s ease",
               }}
               value={editValue}
               placeholder={task.prompt.slice(0, 60)}

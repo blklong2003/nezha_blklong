@@ -44,14 +44,22 @@ function SidebarItem({
   meta?: string;
   onClick?: () => void;
 }) {
+  const [hov, setHov] = useState(false);
   return (
     <div
       style={{
         ...s.sidebarItem,
-        background: active ? "var(--bg-selected)" : "transparent",
-        color: active ? "var(--text-primary)" : "var(--text-muted)",
+        background: active
+          ? "var(--bg-selected)"
+          : hov
+            ? "var(--bg-hover)"
+            : "transparent",
+        color: active ? "var(--text-primary)" : hov ? "var(--text-secondary)" : "var(--text-muted)",
+        transition: "background 0.15s ease, color 0.15s ease",
       }}
       onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
     >
       <span style={{ display: "flex", alignItems: "center" }}>{icon}</span>
       <span style={{ marginLeft: 10, fontSize: 13, fontWeight: active ? 600 : 500 }}>{label}</span>
