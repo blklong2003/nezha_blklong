@@ -113,6 +113,19 @@ export function ProjectRail({
     [groups],
   );
 
+  // 右键菜单状态
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; project: Project } | null>(null);
+
+  const handleProjectContextMenu = useCallback((e: React.MouseEvent, project: Project) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({ x: e.clientX, y: e.clientY, project });
+  }, []);
+
+  const closeContextMenu = useCallback(() => setCtxMenu(null), []);
+
+  // 移动项目到分组 — TODO: 实现分组移动逻辑
+
   // 按分组整理项目
   const groupedProjects = useMemo(() => {
     const result: { group: ProjectGroup | null; projects: Project[] }[] = [];
@@ -491,6 +504,7 @@ export function ProjectRail({
                       translateY={0}
                       onPointerDown={handleRailItemPointerDown}
                       onClick={handleRailItemClick}
+                      onContextMenu={handleProjectContextMenu}
                     />
                   );
                 })}
@@ -642,6 +656,72 @@ export function ProjectRail({
             {draggedProject.name}
           </span>
         </div>
+      )}
+
+      {/* 右键菜单 */}
+      {ctxMenu && (
+        <>
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 998 }}
+            onClick={closeContextMenu}
+            onContextMenu={(e) => { e.preventDefault(); closeContextMenu(); }}
+          />
+          <div
+            style={{
+              position: "fixed",
+              left: Math.min(ctxMenu.x, window.innerWidth - 200),
+              top: Math.min(ctxMenu.y, window.innerHeight - 220),
+              minWidth: 180,
+              background: "var(--bg-panel, #fff)",
+              border: "1px solid var(--border-dim)",
+              borderRadius: 8,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+              zIndex: 999,
+              padding: "4px 0",
+            }}
+          >
+            <div style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, color: "var(--text-primary)", borderBottom: "1px solid var(--border-dim)", marginBottom: 4 }}>
+              {ctxMenu.project.name}
+            </div>
+            <button
+              onClick={() => { closeContextMenu(); }}
+              style={{
+                width: "100%", padding: "6px 12px", textAlign: "left",
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: 12, color: "var(--text-secondary)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+            >
+              移动到分组 ▶
+            </button>
+            <button
+              onClick={() => { onSwitch(ctxMenu.project); closeContextMenu(); }}
+              style={{
+                width: "100%", padding: "6px 12px", textAlign: "left",
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: 12, color: "var(--text-secondary)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+            >
+              前往项目
+            </button>
+            <div style={{ height: 1, margin: "4px 0", background: "var(--border-dim)" }} />
+            <button
+              onClick={() => { closeContextMenu(); }}
+              style={{
+                width: "100%", padding: "6px 12px", textAlign: "left",
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: 12, color: "var(--danger, #dc2626)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+            >
+              从侧边栏隐藏
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

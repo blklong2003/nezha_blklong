@@ -48,6 +48,7 @@ export const RailItem = memo(function RailItem({
   translateY,
   onPointerDown,
   onClick,
+  onContextMenu,
 }: {
   project: Project;
   isActive: boolean;
@@ -59,6 +60,7 @@ export const RailItem = memo(function RailItem({
   translateY: number;
   onPointerDown: (project: Project, event: React.PointerEvent<HTMLButtonElement>) => void;
   onClick: (project: Project) => void;
+  onContextMenu?: (e: React.MouseEvent, project: Project) => void;
 }) {
   const [hov, setHov] = useState(false);
   const [waving, setWaving] = useState(false);
@@ -81,6 +83,7 @@ export const RailItem = memo(function RailItem({
       data-rail-id={project.id}
       onClick={() => onClick(project)}
       onPointerDown={(event) => onPointerDown(project, event)}
+      onContextMenu={(e) => onContextMenu?.(e, project)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       className={isActive ? "rail-active" : undefined}
