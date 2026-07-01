@@ -939,32 +939,62 @@ fn session_belongs_to_project(session_path: &str, project_path_normalized: &str)
     false
 }
 
-/// 从 JSONL 会话文件中提取标题（取第一行 user 消息的摘要或 custom-title）。
+/// 从 JSONL 会话文件中提取标题。
+/// 优先级: custom-title > agent-name > 首条 user 文本 > 文件修改时间
 fn extract_session_title(path: &str) -> Option<String> {
     use std::io::BufRead;
     let file = File::open(path).ok()?;
     let reader = std::io::BufReader::new(file);
-    for line in reader.lines().take(50) {
+    let mut first_user_text: Option<String> = None;
+
+    for line in reader.lines().take(100) {
         let line = line.ok()?;
         let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) else {
             continue;
         };
-        // Claude: 取 message.content 的 text 首行
-        if let Some(msg) = val.get("message") {
-            if let Some(content) = msg.get("content") {
-                if let Some(text) = content.as_str() {
-                    let trimmed = text.trim();
-                    if !trimmed.is_empty() {
-                        return Some(trimmed.chars().take(60).collect());
-                    }
-                }
-                if let Some(arr) = content.as_array() {
-                    for block in arr {
-                        if block.get("type").and_then(|v| v.as_str()) == Some("text") {
-                            if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
-                                let trimmed = text.trim();
-                                if !trimmed.is_empty() {
-                                    return Some(trimmed.chars().take(60).collect());
+
+        // 1) Claude custom-title (最高优先级)
+        if let Some(title) = val.get("customTitle").and_then(|v| v.as_str()) {
+            let trimmed = title.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.chars().take(80).collect());
+            }
+        }
+        if let Some(title) = val.get("custom-title").and_then(|v| v.as_str()) {
+            let trimmed = title.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.chars().take(80).collect());
+            }
+        }
+
+        // 2) Codex agent-name
+        if let Some(agent) = val.get("agentName").and_then(|v| v.as_str()) {
+            let trimmed = agent.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.chars().take(80).collect());
+            }
+        }
+
+        // 3) 首条 user 消息文本
+        if first_user_text.is_none() {
+            if let Some(msg) = val.get("message") {
+                if msg.get("role").and_then(|v| v.as_str()) == Some("user") {
+                    if let Some(content) = msg.get("content") {
+                        if let Some(text) = content.as_str() {
+                            let trimmed = text.trim();
+                            if !trimmed.is_empty() && trimmed.len() > 3 {
+                                first_user_text = Some(trimmed.chars().take(80).collect());
+                            }
+                        }
+                        if let Some(arr) = content.as_array() {
+                            for block in arr {
+                                if block.get("type").and_then(|v| v.as_str()) == Some("text") {
+                                    if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
+                                        let trimmed = text.trim();
+                                        if !trimmed.is_empty() && trimmed.len() > 3 {
+                                            first_user_text = Some(trimmed.chars().take(80).collect());
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -973,6 +1003,20 @@ fn extract_session_title(path: &str) -> Option<String> {
             }
         }
     }
+
+    // 如果找到 user 文本，返回它
+    if let Some(text) = first_user_text {
+        return Some(text);
+    }
+
+    // 4) Fallback: 使用文件修改时间
+    if let Ok(metadata) = std::fs::metadata(path) {
+        if let Ok(modified) = metadata.modified() {
+            let datetime: chrono::DateTime<chrono::Local> = modified.into();
+            return Some(format!("Session {}", datetime.format("%Y-%m-%d %H:%M")));
+        }
+    }
+
     None
 }
 
