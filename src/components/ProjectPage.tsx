@@ -66,6 +66,7 @@ export function ProjectPage({
   onBack,
   onSwitchProject,
   onCommitProjectOrder,
+  onOpen,
   themeVariant,
   themeMode,
   systemPrefersDark,
@@ -139,6 +140,7 @@ export function ProjectPage({
     beforeId: string | null,
     visibleIds: string[],
   ) => void;
+  onOpen: () => void;
   themeVariant: ThemeVariant;
   themeMode: ThemeMode;
   systemPrefersDark: boolean;
@@ -329,6 +331,7 @@ export function ProjectPage({
         attentionBadge={attentionBadge}
         onSwitch={onSwitchProject}
         onCommitProjectOrder={onCommitProjectOrder}
+        onOpen={onOpen}
         singleProjectMode={hubMode}
       />
       <TaskPanel
