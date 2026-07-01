@@ -1130,16 +1130,61 @@ function App() {
     });
   }
 
-  async function handleDeleteTask(taskId: string) {
+  // 软删除：标记为已删除并提供撤销，延迟 6 秒后真正删除
+  const pendingDeletionTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  function handleDeleteTask(taskId: string) {
     const task = tasks.find((item) => item.id === taskId);
     if (!task) return;
-    const promptPreview = `${task.prompt.slice(0, 100)}${task.prompt.length > 100 ? "..." : ""}`;
-    const ok = await confirm(t("task.deletePrompt", { prompt: promptPreview }), {
-      title: t("task.deleteTitle"),
-      kind: "warning",
+
+    // 取消该任务之前的待删除计时器（如果有）
+    const existingTimer = pendingDeletionTimers.current.get(taskId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      pendingDeletionTimers.current.delete(taskId);
+    }
+
+    // 立即从 UI 中移除（软删除）
+    setTasks((prev) => {
+      const next = prev.filter((t) => t.id !== taskId);
+      persistProjectTasks(task.projectId, next, showToast, formatSaveTasksError);
+      return next;
     });
-    if (!ok) return;
-    deleteTasks([taskId]);
+
+    // 显示撤销提示
+    showToast(
+      t("task.deletedWithUndo", { name: task.name ?? task.prompt.slice(0, 30) }),
+      "info",
+      {
+        action: {
+          label: t("common.undo"),
+          onClick: () => {
+            const timer = pendingDeletionTimers.current.get(taskId);
+            if (timer) {
+              clearTimeout(timer);
+              pendingDeletionTimers.current.delete(taskId);
+            }
+            // 恢复任务
+            setTasks((prev) => {
+              // 避免重复添加
+              if (prev.some((t) => t.id === taskId)) return prev;
+              const next = [...prev, task];
+              persistProjectTasks(task.projectId, next, showToast, formatSaveTasksError);
+              return next;
+            });
+          },
+        },
+        duration: 6000,
+      },
+    );
+
+    // 6 秒后真正删除（包括会话文件）
+    const timer = setTimeout(() => {
+      pendingDeletionTimers.current.delete(taskId);
+      // 删除关联的会话文件
+      invoke("delete_session_file", { taskId }).catch(() => {});
+    }, 6000);
+    pendingDeletionTimers.current.set(taskId, timer);
   }
 
   async function handleDeleteAllTasks(project: Project) {

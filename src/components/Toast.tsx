@@ -1,14 +1,25 @@
 import { createContext, useContext, useState, useCallback, useRef } from "react";
 import type React from "react";
 
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface ToastItem {
   id: string;
   message: string;
-  type: "error" | "warning" | "success";
+  type: "error" | "warning" | "success" | "info";
+  action?: ToastAction;
+  duration?: number;
 }
 
 interface ToastContextValue {
-  showToast: (message: string, type?: "error" | "warning" | "success") => void;
+  showToast: (
+    message: string,
+    type?: "error" | "warning" | "success" | "info",
+    options?: { action?: ToastAction; duration?: number },
+  ) => void;
 }
 
 const ToastContext = createContext<ToastContextValue>({ showToast: () => {} });
@@ -21,15 +32,22 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const timerMap = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const showToast = useCallback((message: string, type: "error" | "warning" | "success" = "error") => {
-    const id = `${Date.now()}-${Math.random()}`;
-    setToasts((prev) => [...prev.slice(-2), { id, message, type }]);
-    const timer = setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-      timerMap.current.delete(id);
-    }, 5000);
-    timerMap.current.set(id, timer);
-  }, []);
+  const showToast = useCallback(
+    (
+      message: string,
+      type: "error" | "warning" | "success" | "info" = "error",
+      options?: { action?: ToastAction; duration?: number },
+    ) => {
+      const id = `${Date.now()}-${Math.random()}`;
+      setToasts((prev) => [...prev.slice(-2), { id, message, type, action: options?.action, duration: options?.duration }]);
+      const timer = setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+        timerMap.current.delete(id);
+      }, options?.duration ?? 5000);
+      timerMap.current.set(id, timer);
+    },
+    [],
+  );
 
   const dismiss = useCallback((id: string) => {
     const timer = timerMap.current.get(id);
@@ -77,7 +95,7 @@ function ToastContainer({
           style={{
             pointerEvents: "auto",
             display: "flex",
-            alignItems: "flex-start",
+            alignItems: "center",
             gap: 10,
             padding: "10px 12px 10px 14px",
             borderRadius: 10,
@@ -86,7 +104,9 @@ function ToastContainer({
                 ? "var(--danger)"
                 : t.type === "success"
                   ? "var(--success)"
-                  : "var(--warning)",
+                  : t.type === "info"
+                    ? "var(--accent, #20242e)"
+                    : "var(--warning)",
             color: "var(--fg-on-accent)",
             fontSize: 12.5,
             fontWeight: 500,
@@ -95,6 +115,27 @@ function ToastContainer({
           }}
         >
           <span style={{ flex: 1 }}>{t.message}</span>
+          {t.action && (
+            <button
+              onClick={() => {
+                t.action?.onClick();
+                onDismiss(t.id);
+              }}
+              style={{
+                background: "rgba(255,255,255,0.2)",
+                border: "none",
+                borderRadius: 4,
+                cursor: "pointer",
+                color: "#fff",
+                padding: "3px 10px",
+                fontSize: 12,
+                fontWeight: 600,
+                flexShrink: 0,
+              }}
+            >
+              {t.action.label}
+            </button>
+          )}
           <button
             onClick={() => onDismiss(t.id)}
             style={{
