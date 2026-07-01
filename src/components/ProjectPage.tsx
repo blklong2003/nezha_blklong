@@ -328,10 +328,13 @@ export function ProjectPage({
         projects={allProjects}
         allTasks={tasks}
         activeProjectId={project.id}
+        activeTaskId={selectedTaskId}
         attentionBadge={attentionBadge}
         onSwitch={onSwitchProject}
         onCommitProjectOrder={onCommitProjectOrder}
         onOpen={onOpen}
+        onSelectTask={handleSelectTask}
+        onNewTask={handleNewTask}
         singleProjectMode={hubMode}
       />
       <TaskPanel

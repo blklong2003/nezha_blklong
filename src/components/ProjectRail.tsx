@@ -15,6 +15,7 @@ import {
 import { ProjectDrawer } from "./project-rail/ProjectDrawer";
 import { ProjectRailActions } from "./project-rail/ProjectRailActions";
 import { AttentionIndicator, RailItem } from "./project-rail/RailItem";
+import { ConversationList } from "./project-rail/ConversationList";
 import {
   RAIL_DRAG_THRESHOLD_PX,
   RAIL_PADDING_TOP,
@@ -30,15 +31,19 @@ export function ProjectRail({
   projects,
   allTasks,
   activeProjectId,
+  activeTaskId,
   attentionBadge = true,
   onSwitch,
   onCommitProjectOrder,
   onOpen,
+  onSelectTask,
+  onNewTask,
   singleProjectMode = false,
 }: {
   projects: Project[];
   allTasks: Task[];
   activeProjectId: string;
+  activeTaskId?: string | null;
   attentionBadge?: boolean;
   onSwitch: (project: Project) => void;
   onCommitProjectOrder: (
@@ -47,6 +52,8 @@ export function ProjectRail({
     visibleIds: string[],
   ) => void;
   onOpen: () => void;
+  onSelectTask: (taskId: string) => void;
+  onNewTask: () => void;
   singleProjectMode?: boolean;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -282,25 +289,39 @@ export function ProjectRail({
     });
   }, [projectActivityById, railProjects]);
 
+  // 当前项目的对话列表
+  const projectTasks = useMemo(
+    () => allTasks.filter((t) => t.projectId === activeProjectId),
+    [allTasks, activeProjectId],
+  );
+
   return (
     <div
-      ref={railContainerRef}
       style={{
-        position: "relative",
-        width: 52,
+        display: "flex",
         flexShrink: 0,
         background: "var(--bg-sidebar)",
         borderRight: "1px solid var(--border-dim)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        paddingTop: RAIL_PADDING_TOP,
-        paddingBottom: 10,
-        gap: 5,
-        overflow: "visible",
+        overflow: "hidden",
         zIndex: drawerOpen ? 50 : "auto",
       }}
     >
+      {/* Column 1: Project rail (narrow icon strip) */}
+      <div
+        ref={railContainerRef}
+        style={{
+          position: "relative",
+          width: 52,
+          flexShrink: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          paddingTop: RAIL_PADDING_TOP,
+          paddingBottom: 10,
+          gap: 5,
+          overflow: "visible",
+        }}
+      >
       {railProjects.map((project, index) => {
         const isDragging = dragOrigin?.draggedId === project.id;
         const activity = getProjectActivity(projectActivityById, project.id);
@@ -364,6 +385,17 @@ export function ProjectRail({
             />
           </div>
         </div>
+      )}
+      </div>
+
+      {/* Column 2: Conversation list for selected project */}
+      {!singleProjectMode && (
+        <ConversationList
+          tasks={projectTasks}
+          activeTaskId={activeTaskId ?? null}
+          onSelectTask={onSelectTask}
+          onNewTask={onNewTask}
+        />
       )}
     </div>
   );

@@ -135,6 +135,10 @@
 
   --font-ui: "SF Pro Display", "IBM Plex Sans", "PingFang SC", "Noto Sans SC", sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Mono", Consolas, "SF Mono", Menlo, ui-monospace, monospace;
+
+  /* Conversation list (two-column sidebar) */
+  --conversation-active-bg: rgba(15, 23, 42, 0.06);
+  --conversation-active-bar: #20242e;
 }
 
 /* Design tokens: eye-care theme (warm sepia, low-contrast) */
@@ -187,6 +191,9 @@ html.eyecare {
   --code-line-divider: rgba(101, 84, 51, 0.12);
   --code-line-hover-bg: rgba(101, 84, 51, 0.06);
   --image-checker-bg: rgba(101, 84, 51, 0.08);
+
+  --conversation-active-bg: rgba(15, 23, 42, 0.08);
+  --conversation-active-bar: #8b7355;
 }
 
 /* Design tokens: dark theme */
@@ -290,6 +297,9 @@ html.dark {
   --shadow-toast: 0 4px 16px rgba(0, 0, 0, 0.55), 0 1px 4px rgba(0, 0, 0, 0.35);
   --shadow-media: 0 16px 40px rgba(0, 0, 0, 0.6);
   --agent-badge-filter: brightness(0) invert(1) opacity(0.7);
+
+  --conversation-active-bg: rgba(255, 255, 255, 0.08);
+  --conversation-active-bar: #4ade80;
 }
 
 /* Design tokens: midnight dark theme (neutral near-black).
@@ -317,4 +327,7 @@ html.midnight {
 
   --code-line-hover-bg: rgba(255, 255, 255, 0.04);
   --image-checker-bg: rgba(255, 255, 255, 0.04);
+
+  --conversation-active-bg: rgba(255, 255, 255, 0.06);
+  --conversation-active-bar: #4ade80;
 }
