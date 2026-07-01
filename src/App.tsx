@@ -1525,6 +1525,7 @@ function App() {
               onSwitchProject={handleProjectClick}
               onCommitProjectOrder={handleCommitProjectOrder}
               onMoveToGroup={handleMoveToGroup}
+              onMoveToHidden={handleToggleProjectHidden}
               onOpen={handleOpen}
               saveNewTaskDraft={saveNewTaskDraft}
               getNewTaskDraft={getNewTaskDraft}

@@ -31,6 +31,7 @@ export function ProjectRail({
   onSwitch,
   onCommitProjectOrder,
   onMoveToGroup,
+  onMoveToHidden,
   onOpen,
   singleProjectMode = false,
 }: {
@@ -45,6 +46,7 @@ export function ProjectRail({
     visibleIds: string[],
   ) => void;
   onMoveToGroup: (projectId: string, groupId: string | null) => void;
+  onMoveToHidden: (projectId: string) => void;
   onOpen: () => void;
   singleProjectMode?: boolean;
 }) {
@@ -115,12 +117,17 @@ export function ProjectRail({
   );
 
   // 右键菜单状态
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; project: Project } | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number;
+    y: number;
+    project: Project;
+    showGroupSubmenu: boolean;
+  } | null>(null);
 
   const handleProjectContextMenu = useCallback((e: React.MouseEvent, project: Project) => {
     e.preventDefault();
     e.stopPropagation();
-    setCtxMenu({ x: e.clientX, y: e.clientY, project });
+    setCtxMenu({ x: e.clientX, y: e.clientY, project, showGroupSubmenu: false });
   }, []);
 
   const closeContextMenu = useCallback(() => setCtxMenu(null), []);
@@ -128,6 +135,26 @@ export function ProjectRail({
   // 分组拖拽重排序状态
   const [draggingGroupId, setDraggingGroupId] = useState<string | null>(null);
   const [groupDropTarget, setGroupDropTarget] = useState<string | null>(null);
+  const [hoveredGroup, setHoveredGroup] = useState<string | null>(null);
+  const [groupCtxMenu, setGroupCtxMenu] = useState<{ x: number; y: number; group: ProjectGroup } | null>(null);
+
+  const deleteGroup = useCallback(
+    (groupId: string) => {
+      setGroups((prev) => {
+        const next = prev.filter((g) => g.id !== groupId);
+        invoke("save_project_groups", { groups: next }).catch(() => {});
+        return next;
+      });
+      // 清除已删除分组的折叠状态
+      setGroupCollapsed((prev) => {
+        const next = { ...prev };
+        delete next[groupId];
+        return next;
+      });
+      setGroupCtxMenu(null);
+    },
+    [],
+  );
 
   const handleGroupDragStart = useCallback((e: React.PointerEvent, groupId: string) => {
     // 如果点击的是展开/折叠箭头区域，不触发拖拽
@@ -574,6 +601,11 @@ export function ProjectRail({
               {group && (
                 <div
                   data-group-id={group.id}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setGroupCtxMenu({ x: e.clientX, y: e.clientY, group });
+                  }}
                   style={{
                     position: "relative",
                     background: draggingGroupId === group.id
@@ -586,55 +618,80 @@ export function ProjectRail({
                     borderRadius: 6,
                     transition: "background 0.15s ease",
                   }}
+                  onMouseEnter={() => setHoveredGroup(group.id)}
+                  onMouseLeave={() => setHoveredGroup(null)}
                 >
                   {/* 拖拽指示线（目标位置上方） */}
                   {groupDropTarget === group.id && draggingGroupId !== group.id && (
                     <div style={{ position: "absolute", top: 0, left: 8, right: 8, height: 2, background: "var(--accent, #4ade80)", zIndex: 1 }} />
                   )}
-                  <button
-                    data-toggle="group"
-                    onPointerDown={(e) => handleGroupDragStart(e, group.id)}
-                    onClick={() => {
-                      // 如果是拖拽触发的点击，忽略
-                      if (draggingGroupId) return;
-                      toggleGroup(group.id);
-                    }}
-                    style={{
-                      width: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "6px 14px 4px",
-                      background: "none",
-                      border: "none",
-                      cursor: draggingGroupId ? "grabbing" : "pointer",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: draggingGroupId === group.id ? "var(--text-primary)" : "var(--text-hint)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      textAlign: "left",
-                      opacity: draggingGroupId === group.id ? 0.5 : 1,
-                      transition: "color 0.15s ease, opacity 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!draggingGroupId) e.currentTarget.style.color = "var(--text-secondary)";
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!draggingGroupId) e.currentTarget.style.color = "var(--text-hint)";
-                    }}
-                    title={isCollapsed ? "展开分组 (+拖动排序)" : "折叠分组 (+拖动排序)"}
-                  >
-                    <span style={{ fontSize: 10, transform: isCollapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s ease" }}>
-                      ▶
-                    </span>
-                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {group.name}
-                    </span>
-                    <span style={{ opacity: 0.6 }}>({groupProjects.length})</span>
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <button
+                      data-toggle="group"
+                      onPointerDown={(e) => handleGroupDragStart(e, group.id)}
+                      onClick={() => {
+                        if (draggingGroupId) return;
+                        toggleGroup(group.id);
+                      }}
+                      style={{
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        padding: "6px 14px 4px",
+                        background: "none",
+                        border: "none",
+                        cursor: draggingGroupId ? "grabbing" : "pointer",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: draggingGroupId === group.id ? "var(--text-primary)" : "var(--text-hint)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.5px",
+                        textAlign: "left",
+                        opacity: draggingGroupId === group.id ? 0.5 : 1,
+                        transition: "color 0.15s ease, opacity 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!draggingGroupId) e.currentTarget.style.color = "var(--text-secondary)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!draggingGroupId) e.currentTarget.style.color = "var(--text-hint)";
+                      }}
+                      title={isCollapsed ? "展开分组 (+拖动排序)" : "折叠分组 (+拖动排序)"}
+                    >
+                      <span style={{ fontSize: 10, transform: isCollapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s ease" }}>
+                        ▶
+                      </span>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>
+                        {group.name}
+                      </span>
+                      <span style={{ opacity: 0.6, marginLeft: 4 }}>({groupProjects.length})</span>
+                    </button>
+                    {/* 分组操作按钮（悬停显示） */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setGroupCtxMenu({ x: e.clientX, y: e.clientY, group });
+                      }}
+                      style={{
+                        padding: "2px 6px",
+                        marginRight: 4,
+                        background: "none",
+                        border: "none",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                        color: "var(--text-hint)",
+                        fontSize: 12,
+                        opacity: hoveredGroup === group.id ? 1 : 0,
+                        transition: "opacity 0.15s ease",
+                      }}
+                      title="分组操作"
+                    >
+                      ⋯
+                    </button>
+                  </div>
                 </div>
-              )}
+             )}
               {/* 分组项目（折叠时隐藏） */}
               {!isCollapsed &&
                 groupProjects.map((project) => {
@@ -818,56 +875,208 @@ export function ProjectRail({
           <div
             style={{
               position: "fixed",
-              left: Math.min(ctxMenu.x, window.innerWidth - 200),
-              top: Math.min(ctxMenu.y, window.innerHeight - 220),
-              minWidth: 180,
+              left: Math.min(ctxMenu.x, window.innerWidth - 220),
+              top: Math.min(ctxMenu.y, window.innerHeight - 300),
+              minWidth: 200,
+              maxWidth: 260,
               background: "var(--bg-panel, #fff)",
               border: "1px solid var(--border-dim)",
               borderRadius: 8,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+              boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
               zIndex: 999,
               padding: "4px 0",
             }}
           >
-            <div style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, color: "var(--text-primary)", borderBottom: "1px solid var(--border-dim)", marginBottom: 4 }}>
+            {/* 标题 */}
+            <div style={{ padding: "8px 14px", fontSize: 13, fontWeight: 600, color: "var(--text-primary)", borderBottom: "1px solid var(--border-dim)", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {ctxMenu.project.name}
             </div>
-            <button
-              onClick={() => { closeContextMenu(); }}
-              style={{
-                width: "100%", padding: "6px 12px", textAlign: "left",
-                background: "none", border: "none", cursor: "pointer",
-                fontSize: 12, color: "var(--text-secondary)",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-            >
-              移动到分组 ▶
-            </button>
+
+            {/* 移动到分组 */}
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCtxMenu((prev => prev ? { ...prev, showGroupSubmenu: !prev.showGroupSubmenu } : null));
+                }}
+                style={{
+                  width: "100%", padding: "7px 14px", textAlign: "left",
+                  background: ctxMenu.showGroupSubmenu ? "var(--bg-hover)" : "none",
+                  border: "none", cursor: "pointer",
+                  fontSize: 12.5, color: "var(--text-secondary)",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}
+                onMouseEnter={(e) => { if (!ctxMenu.showGroupSubmenu) e.currentTarget.style.background = "var(--bg-hover)"; }}
+                onMouseLeave={(e) => { if (!ctxMenu.showGroupSubmenu) e.currentTarget.style.background = "none"; }}
+              >
+                <span>移动到分组</span>
+                <span style={{ fontSize: 10, opacity: 0.6 }}>▶</span>
+              </button>
+
+              {/* 子菜单：分组列表 */}
+              {ctxMenu.showGroupSubmenu && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "100%",
+                    top: 0,
+                    minWidth: 160,
+                    background: "var(--bg-panel, #fff)",
+                    border: "1px solid var(--border-dim)",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+                    zIndex: 1000,
+                    padding: "4px 0",
+                    marginLeft: 4,
+                  }}
+                >
+                  {/* 未分组选项 */}
+                  <button
+                    onClick={() => {
+                      onMoveToGroup(ctxMenu.project.id, null);
+                      closeContextMenu();
+                    }}
+                    style={{
+                      width: "100%", padding: "6px 12px", textAlign: "left",
+                      background: !ctxMenu.project.groupId ? "var(--accent-subtle)" : "none",
+                      border: "none", cursor: "pointer",
+                      fontSize: 12, color: ctxMenu.project.groupId ? "var(--text-secondary)" : "var(--accent)",
+                    }}
+                  >
+                    {!ctxMenu.project.groupId ? "✓ " : ""}未分组
+                  </button>
+                  {/* 分组列表 */}
+                  {groups.map((g) => (
+                    <button
+                      key={g.id}
+                      onClick={() => {
+                        onMoveToGroup(ctxMenu.project.id, g.id);
+                        closeContextMenu();
+                      }}
+                      style={{
+                        width: "100%", padding: "6px 12px", textAlign: "left",
+                        background: ctxMenu.project.groupId === g.id ? "var(--accent-subtle)" : "none",
+                        border: "none", cursor: "pointer",
+                        fontSize: 12, color: ctxMenu.project.groupId === g.id ? "var(--accent)" : "var(--text-secondary)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}
+                    >
+                      {ctxMenu.project.groupId === g.id ? "✓ " : ""}{g.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 前往项目 */}
             <button
               onClick={() => { onSwitch(ctxMenu.project); closeContextMenu(); }}
               style={{
-                width: "100%", padding: "6px 12px", textAlign: "left",
+                width: "100%", padding: "7px 14px", textAlign: "left",
                 background: "none", border: "none", cursor: "pointer",
-                fontSize: 12, color: "var(--text-secondary)",
+                fontSize: 12.5, color: "var(--text-secondary)",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
             >
               前往项目
             </button>
+
             <div style={{ height: 1, margin: "4px 0", background: "var(--border-dim)" }} />
+
+            {/* 从侧边栏隐藏（低优先级） */}
             <button
-              onClick={() => { closeContextMenu(); }}
+              onClick={() => {
+                onMoveToHidden(ctxMenu.project.id);
+                closeContextMenu();
+              }}
               style={{
-                width: "100%", padding: "6px 12px", textAlign: "left",
+                width: "100%", padding: "7px 14px", textAlign: "left",
                 background: "none", border: "none", cursor: "pointer",
-                fontSize: 12, color: "var(--danger, #dc2626)",
+                fontSize: 12.5, color: "var(--text-hint)",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
             >
               从侧边栏隐藏
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* 分组右键菜单 */}
+      {groupCtxMenu && (
+        <>
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 998 }}
+            onClick={() => setGroupCtxMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setGroupCtxMenu(null); }}
+          />
+          <div
+            style={{
+              position: "fixed",
+              left: Math.min(groupCtxMenu.x, window.innerWidth - 200),
+              top: Math.min(groupCtxMenu.y, window.innerHeight - 160),
+              minWidth: 180,
+              background: "var(--bg-panel, #fff)",
+              border: "1px solid var(--border-dim)",
+              borderRadius: 8,
+              boxShadow: "0 4px 24px rgba(0,0,0,0.18)",
+              zIndex: 999,
+              padding: "4px 0",
+            }}
+          >
+            <div style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, color: "var(--text-primary)", borderBottom: "1px solid var(--border-dim)", marginBottom: 4 }}>
+              分组: {groupCtxMenu.group.name}
+            </div>
+            <button
+              onClick={() => {
+                // 折叠/展开分组
+                toggleGroup(groupCtxMenu.group.id);
+                setGroupCtxMenu(null);
+              }}
+              style={{
+                width: "100%", padding: "7px 14px", textAlign: "left",
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: 12.5, color: "var(--text-secondary)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+            >
+              {groupCollapsed[groupCtxMenu.group.id] ? "展开分组" : "折叠分组"}
+            </button>
+            <button
+              onClick={() => {
+                // 移除分组中的所有项目（将它们变为未分组）
+                projects.filter((p) => p.groupId === groupCtxMenu.group.id).forEach((p) => onMoveToGroup(p.id, null));
+                setGroupCtxMenu(null);
+              }}
+              style={{
+                width: "100%", padding: "7px 14px", textAlign: "left",
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: 12.5, color: "var(--text-secondary)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+            >
+              移除分组中所有项目
+            </button>
+            <div style={{ height: 1, margin: "4px 0", background: "var(--border-dim)" }} />
+            <button
+              onClick={() => {
+                if (confirm(`确定删除分组「${groupCtxMenu.group.name}」吗？分组中的项目将变为未分组。`)) {
+                  deleteGroup(groupCtxMenu.group.id);
+                }
+              }}
+              style={{
+                width: "100%", padding: "7px 14px", textAlign: "left",
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: 12.5, color: "var(--danger, #dc2626)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
+            >
+              删除分组
             </button>
           </div>
         </>
