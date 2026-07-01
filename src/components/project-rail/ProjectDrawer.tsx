@@ -16,6 +16,7 @@ export function ProjectDrawer({
   showBadge,
   onSwitch,
   onClose,
+  railWidth = 180,
 }: {
   projects: Project[];
   activityByProjectId: Map<string, ProjectActivity>;
@@ -23,6 +24,7 @@ export function ProjectDrawer({
   showBadge: boolean;
   onSwitch: (p: Project) => void;
   onClose: () => void;
+  railWidth?: number;
 }) {
   const { t } = useI18n();
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -47,7 +49,7 @@ export function ProjectDrawer({
       ref={drawerRef}
       style={{
         position: "absolute",
-        left: 180,
+        left: railWidth,
         top: 0,
         bottom: 0,
         width: 220,

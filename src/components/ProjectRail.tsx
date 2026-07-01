@@ -281,12 +281,51 @@ export function ProjectRail({
     });
   }, [projectActivityById, railProjects]);
 
+  // 侧边栏宽度调整
+  const [railWidth, setRailWidth] = useState(() => {
+    const saved = localStorage.getItem("nezha:rail-width");
+    return saved ? Math.max(140, Math.min(320, parseInt(saved, 10))) : 180;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(180);
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    resizeStartX.current = e.clientX;
+    resizeStartWidth.current = railWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const handleMove = (e: MouseEvent) => {
+      const delta = e.clientX - resizeStartX.current;
+      const newWidth = Math.max(140, Math.min(320, resizeStartWidth.current + delta));
+      setRailWidth(newWidth);
+    };
+    const handleUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      localStorage.setItem("nezha:rail-width", String(railWidth));
+    };
+    document.addEventListener("mousemove", handleMove);
+    document.addEventListener("mouseup", handleUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleUp);
+    };
+  }, [isResizing, railWidth]);
+
   return (
     <div
       ref={railContainerRef}
       style={{
         position: "relative",
-        width: 180,
+        width: railWidth,
         flexShrink: 0,
         background: "var(--bg-sidebar)",
         borderRight: "1px solid var(--border-dim)",
@@ -294,8 +333,9 @@ export function ProjectRail({
         flexDirection: "column",
         paddingTop: RAIL_PADDING_TOP,
         paddingBottom: 10,
-        overflow: "visible",
+        overflow: isResizing ? "hidden" : "visible",
         zIndex: drawerOpen ? 50 : "auto",
+        transition: isResizing ? "none" : "width 0.1s ease",
       }}
     >
       {/* Scrollable project list */}
@@ -360,6 +400,28 @@ export function ProjectRail({
         />
       )}
 
+      {/* Resize handle — right edge */}
+      <div
+        onMouseDown={handleResizeStart}
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          right: -3,
+          width: 6,
+          cursor: "col-resize",
+          zIndex: 10,
+          background: isResizing ? "var(--accent, #4ade80)" : "transparent",
+          transition: "background 0.15s ease",
+        }}
+        onMouseEnter={(e) => {
+          if (!isResizing) (e.currentTarget as HTMLDivElement).style.background = "var(--accent, #4ade80)";
+        }}
+        onMouseLeave={(e) => {
+          if (!isResizing) (e.currentTarget as HTMLDivElement).style.background = "transparent";
+        }}
+      />
+
       {drawerOpen && !singleProjectMode && (
         <ProjectDrawer
           projects={projects}
@@ -368,6 +430,7 @@ export function ProjectRail({
           showBadge={attentionBadge}
           onSwitch={onSwitch}
           onClose={() => setDrawerOpen(false)}
+          railWidth={railWidth}
         />
       )}
 
