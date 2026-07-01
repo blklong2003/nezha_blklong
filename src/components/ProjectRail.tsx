@@ -52,6 +52,11 @@ export function ProjectRail({
     () => projects.filter((p) => !p.hiddenFromRail || p.id === activeProjectId),
     [projects, activeProjectId],
   );
+  // 是否存在隐藏项目 — 决定是否需要显示抽屉切换按钮
+  const hasHiddenProjects = useMemo(
+    () => projects.some((p) => p.hiddenFromRail),
+    [projects],
+  );
   const projectActivityById = useMemo(() => buildProjectActivityMap(allTasks), [allTasks]);
 
   // 拖拽相关:dragOrigin 一旦设置就开始监听 document 事件;dragViz 高频更新 dropIndex / preview
@@ -318,7 +323,7 @@ export function ProjectRail({
         })}
       </div>
 
-      {!singleProjectMode && (
+      {!singleProjectMode && hasHiddenProjects && (
         <ProjectRailActions
           drawerOpen={drawerOpen}
           onToggleDrawer={() => setDrawerOpen((v) => !v)}
