@@ -288,7 +288,7 @@ export function ProjectRail({
         position: "relative",
         width: 180,
         flexShrink: 0,
-        background: "var(--bg-sidebar, linear-gradient(180deg, var(--bg-sidebar), var(--bg-sidebar-elevated)))",
+        background: "var(--bg-sidebar)",
         borderRight: "1px solid var(--border-dim)",
         display: "flex",
         flexDirection: "column",

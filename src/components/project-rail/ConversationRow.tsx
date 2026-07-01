@@ -13,19 +13,19 @@ const STATUS_COLOR: Record<string, string> = {
   interrupted: "#fbbf24",
 };
 
-function timeAgo(ts: number): string {
+function formatTimeAgo(ts: number, t: (key: string, params?: Record<string, string | number>) => string): string {
   const diff = Date.now() - ts;
-  if (diff < 60000) return "just now";
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
-  if (diff < 604800000) return `${Math.floor(diff / 86400000)}d`;
-  return `${Math.floor(diff / 604800000)}w`;
+  if (diff < 60000) return t("time.justNow");
+  if (diff < 3600000) return t("time.minutesAgo", { n: Math.floor(diff / 60000) });
+  if (diff < 86400000) return t("time.hoursAgo", { n: Math.floor(diff / 3600000) });
+  if (diff < 604800000) return t("time.daysAgo", { n: Math.floor(diff / 86400000) });
+  return t("time.weeksAgo", { n: Math.floor(diff / 604800000) });
 }
 
-function taskTitle(task: Task): string {
+function getTaskTitle(task: Task, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (task.name && task.name.trim()) return task.name;
   const p = task.prompt?.trim() ?? "";
-  return p ? p.split("\n")[0].slice(0, 40) : "(untitled)";
+  return p ? p.split("\n")[0].slice(0, 40) : t("timeline.untitled");
 }
 
 export function ConversationRow({
@@ -39,8 +39,8 @@ export function ConversationRow({
 }) {
   const { t } = useI18n();
   const color = STATUS_COLOR[task.status] ?? "#52525b";
-  const title = taskTitle(task);
-  const time = timeAgo(task.updatedAt ?? task.createdAt);
+  const title = getTaskTitle(task, t);
+  const time = formatTimeAgo(task.updatedAt ?? task.createdAt, t);
   const statusLabel = t(`conversation.status.${task.status}`);
 
   return (
@@ -54,17 +54,22 @@ export function ConversationRow({
         padding: "8px 10px",
         borderRadius: 8,
         border: "none",
-        background: isActive ? "var(--conversation-active-bg, var(--accent-subtle))" : "transparent",
+        background: isActive
+          ? "var(--conversation-active-bg, var(--accent-subtle))"
+          : "transparent",
         cursor: "pointer",
         textAlign: "left",
-        transition: "background 0.12s",
+        transition: "background 0.15s ease, transform 0.12s ease",
         position: "relative",
+        transform: isActive ? "translateX(2px)" : "none",
       }}
       onMouseEnter={(e) => {
-        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)";
+        if (!isActive)
+          (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-hover)";
       }}
       onMouseLeave={(e) => {
-        if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+        if (!isActive)
+          (e.currentTarget as HTMLButtonElement).style.background = "transparent";
       }}
     >
       {/* active indicator bar */}

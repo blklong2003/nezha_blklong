@@ -27,7 +27,7 @@ export function ProjectRailActions({
         onMouseLeave={() => setAddHov(false)}
         style={{
           width: "100%",
-          height: 36,
+          height: 38,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -35,10 +35,10 @@ export function ProjectRailActions({
           padding: "0 12px",
           background: addHov ? "var(--bg-hover)" : "var(--bg-card)",
           border: "1px solid var(--border-medium)",
-          borderRadius: 8,
+          borderRadius: 10,
           cursor: "pointer",
           color: addHov ? "var(--text-primary)" : "var(--text-muted)",
-          transition: "background 0.12s, color 0.12s",
+          transition: "background 0.15s ease, color 0.15s ease, transform 0.1s ease",
           fontSize: 12.5,
           fontWeight: 500,
         }}
@@ -60,7 +60,11 @@ export function ProjectRailActions({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: drawerOpen ? "var(--accent-subtle)" : expandHov ? "var(--bg-hover)" : "none",
+            background: drawerOpen
+              ? "var(--accent-subtle)"
+              : expandHov
+                ? "var(--bg-hover)"
+                : "none",
             border: "none",
             borderRadius: 8,
             cursor: "pointer",
@@ -69,7 +73,7 @@ export function ProjectRailActions({
               : expandHov
                 ? "var(--text-muted)"
                 : "var(--text-hint)",
-            transition: "background 0.12s, color 0.12s",
+            transition: "background 0.15s ease, color 0.15s ease",
           }}
         >
           <ChevronsRight
@@ -77,7 +81,7 @@ export function ProjectRailActions({
             strokeWidth={2.5}
             style={{
               transform: drawerOpen ? "rotate(180deg)" : "none",
-              transition: "transform 0.18s",
+              transition: "transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
             }}
           />
         </button>

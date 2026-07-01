@@ -236,6 +236,9 @@ function TasksView({
       <div style={{ flex: 1, overflowY: "auto" }}>
         {loading && <Hint>{t("session.loading")}</Hint>}
         {error && <Hint>{error}</Hint>}
+        {!loading && !error && data?.length === 0 && (
+          <Hint>{t("conversation.empty")}</Hint>
+        )}
         {data?.map((task) => (
           <button key={task.id} style={rowBtn} onClick={() => onOpen(task)}>
             <StatusDot status={task.status} />
@@ -363,34 +366,36 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
           <div
             style={{
               margin: "8px 0 0",
-              padding: "8px 10px",
-              fontSize: 11.5,
+              padding: "10px 12px",
+              fontSize: 12,
               fontFamily: "var(--font-mono)",
               color: "var(--text-muted)",
               background: "var(--bg-input)",
               border: "1px solid var(--border-dim)",
-              borderRadius: 6,
+              borderRadius: 8,
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
-              opacity: 0.85,
+              opacity: 0.9,
               display: "flex",
               gap: 8,
               alignItems: "flex-start",
+              transition: "opacity 0.2s ease",
             }}
           >
-            <span style={{ flexShrink: 0, marginTop: 3 }}>
+            <span style={{ flexShrink: 0, marginTop: 4 }}>
               <span
                 style={{
                   display: "inline-block",
-                  width: 7,
-                  height: 7,
+                  width: 8,
+                  height: 8,
                   borderRadius: "50%",
-                  background: "#4ade80",
+                  background: "var(--accent, #4ade80)",
                   animation: "nezha-pulse 1.5s ease-in-out infinite",
+                  boxShadow: "0 0 6px var(--accent, #4ade80)",
                 }}
               />
             </span>
-            <span style={{ flex: 1 }}>{liveTail}</span>
+            <span style={{ flex: 1, lineHeight: 1.5 }}>{liveTail}</span>
           </div>
         )}
       </div>
@@ -435,7 +440,10 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
           value={input}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") send();
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
           }}
           placeholder={t("remote.messagePlaceholder")}
           style={{
@@ -443,11 +451,20 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
             minWidth: 0,
             background: "var(--bg-input)",
             border: "1px solid var(--border-dim)",
-            borderRadius: 8,
+            borderRadius: 12,
             color: "var(--text-primary)",
-            fontSize: 15,
-            padding: "10px 12px",
+            fontSize: 16,
+            padding: "10px 14px",
             outline: "none",
+            transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = "var(--accent, #4ade80)";
+            e.currentTarget.style.boxShadow = "0 0 0 3px color-mix(in srgb, var(--accent, #4ade80) 20%, transparent)";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-dim)";
+            e.currentTarget.style.boxShadow = "none";
           }}
         />
         <button
@@ -457,14 +474,16 @@ function ConversationView({ task, onBack }: { task: RemoteTask; onBack: () => vo
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 42,
+            width: 44,
+            height: 44,
             flexShrink: 0,
-            background: "var(--accent, #4ade80)",
+            background: sending || !input.trim() ? "var(--bg-input)" : "var(--accent, #4ade80)",
             border: "none",
-            borderRadius: 8,
-            color: "#fff",
-            cursor: "pointer",
-            opacity: sending || !input.trim() ? 0.5 : 1,
+            borderRadius: 12,
+            color: sending || !input.trim() ? "var(--text-hint)" : "#fff",
+            cursor: sending || !input.trim() ? "default" : "pointer",
+            transition: "background 0.15s ease, color 0.15s ease, transform 0.1s ease",
+            transform: sending ? "scale(0.95)" : "scale(1)",
           }}
           aria-label="send"
         >

@@ -18,6 +18,8 @@ export function railDragPreviewStyle({
   size: number;
   horizontal?: boolean;
 }): React.CSSProperties {
+  const activeShadow = "0 12px 40px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.18)";
+
   if (horizontal) {
     return {
       position: "fixed",
@@ -30,11 +32,12 @@ export function railDragPreviewStyle({
       gap: 10,
       padding: "0 12px",
       borderRadius: 10,
-      background: "color-mix(in srgb, var(--bg-sidebar) 84%, white 16%)",
-      boxShadow: "0 12px 28px rgba(0,0,0,0.24)",
-      transform: "scale(1.05)",
+      background: "color-mix(in srgb, var(--bg-sidebar) 90%, white 10%)",
+      boxShadow: activeShadow,
+      transform: "scale(1.03)",
       pointerEvents: "none",
       zIndex: 999,
+      transition: "transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s ease",
     };
   }
   return {
@@ -47,11 +50,12 @@ export function railDragPreviewStyle({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 10,
-    background: "color-mix(in srgb, var(--bg-sidebar) 84%, white 16%)",
-    boxShadow: "0 12px 28px rgba(0,0,0,0.24)",
-    transform: "scale(1.08)",
+    background: "color-mix(in srgb, var(--bg-sidebar) 90%, white 10%)",
+    boxShadow: activeShadow,
+    transform: "scale(1.05)",
     pointerEvents: "none",
     zIndex: 999,
+    transition: "transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s ease",
   };
 }
 
