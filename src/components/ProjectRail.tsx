@@ -3,6 +3,7 @@ import type { Project, Task } from "../types";
 import { ProjectAvatar } from "./ProjectAvatar";
 import {
   RAIL_ITEM_SIZE,
+  RAIL_ITEM_GAP,
   RAIL_ITEM_STRIDE,
   railDragPreviewAvatarWrap,
   railDragPreviewStyle,
@@ -287,7 +288,7 @@ export function ProjectRail({
       ref={railContainerRef}
       style={{
         position: "relative",
-        width: 52,
+        width: 64,
         flexShrink: 0,
         background: "var(--bg-sidebar)",
         borderRight: "1px solid var(--border-dim)",
@@ -296,7 +297,7 @@ export function ProjectRail({
         alignItems: "center",
         paddingTop: RAIL_PADDING_TOP,
         paddingBottom: 10,
-        gap: 5,
+        gap: RAIL_ITEM_GAP,
         overflow: "visible",
         zIndex: drawerOpen ? 50 : "auto",
       }}
