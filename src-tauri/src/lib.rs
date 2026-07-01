@@ -263,6 +263,8 @@ pub fn run() {
             session::resolve_session_path,
             session::read_session_messages,
             session::export_session_markdown,
+            session::delete_session_file,
+            session::delete_project_sessions,
             config::init_project_config,
             config::read_project_config,
             config::write_project_config,

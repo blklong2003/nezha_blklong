@@ -999,6 +999,11 @@ function App() {
           if (proj) cleanupTaskWorktree(task, proj.path);
         });
 
+      // 删除对应的会话 JSONL 文件
+      taskIds.forEach((taskId) => {
+        invoke("delete_session_file", { taskId }).catch(() => {});
+      });
+
       const next = prev.filter((task) => !toDelete.has(task.id));
       const affectedProjectIds = new Set(deletingTasks.map((t) => t.projectId));
       affectedProjectIds.forEach((pid) =>
@@ -1141,6 +1146,8 @@ function App() {
     if (!ok) return;
     const projectTaskIds = tasks.filter((t) => t.projectId === projectId).map((t) => t.id);
     deleteTasks(projectTaskIds);
+    // 删除该项目下所有会话 JSONL 文件
+    invoke("delete_project_sessions", { projectId }).catch(() => {});
     invoke<number>("cleanup_installations_for_project", { projectId }).catch((e) =>
       console.error("cleanup_installations_for_project failed", e),
     );

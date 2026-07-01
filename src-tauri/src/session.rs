@@ -714,6 +714,56 @@ pub async fn read_session_messages(session_path: String) -> Result<Vec<SessionMe
     parse_session_messages_file(&session_path)
 }
 
+/// 删除单个任务的会话 JSONL 文件（由前端任务删除时调用）。
+#[tauri::command]
+pub async fn delete_session_file(task_id: String) -> Result<(), String> {
+    let dir = nezha_data_dir().ok_or("no data dir")?;
+    let projects: Vec<Value> = std::fs::read_to_string(dir.join("projects.json"))
+        .ok()
+        .and_then(|c| serde_json::from_str(&c).ok())
+        .unwrap_or_default();
+
+    for project in &projects {
+        let Some(pid) = project["id"].as_str() else { continue };
+        if !is_safe_id(pid) { continue; }
+        let tasks_path = dir.join("projects").join(pid).join("tasks.json");
+        let tasks: Vec<Value> = std::fs::read_to_string(&tasks_path)
+            .ok()
+            .and_then(|c| serde_json::from_str(&c).ok())
+            .unwrap_or_default();
+
+        if let Some(task) = tasks.iter().find(|t| t["id"].as_str() == Some(task_id.as_str())) {
+            for key in &["claudeSessionPath", "codexSessionPath"] {
+                if let Some(path) = task[key].as_str() {
+                    let _ = std::fs::remove_file(path);
+                }
+            }
+            return Ok(());
+        }
+    }
+    Ok(())
+}
+
+/// 删除某项目下所有任务的会话 JSONL 文件（由前端删除项目时调用）。
+#[tauri::command]
+pub async fn delete_project_sessions(project_id: String) -> Result<(), String> {
+    let dir = nezha_data_dir().ok_or("no data dir")?;
+    let tasks_path = dir.join("projects").join(&project_id).join("tasks.json");
+    let tasks: Vec<Value> = std::fs::read_to_string(&tasks_path)
+        .ok()
+        .and_then(|c| serde_json::from_str(&c).ok())
+        .unwrap_or_default();
+
+    for task in &tasks {
+        for key in &["claudeSessionPath", "codexSessionPath"] {
+            if let Some(path) = task[key].as_str() {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+    Ok(())
+}
+
 fn is_codex_format(lines: &[&str]) -> bool {
     for line in lines.iter().take(10) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
