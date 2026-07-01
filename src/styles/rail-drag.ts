@@ -11,11 +11,32 @@ export function railDragPreviewStyle({
   x,
   y,
   size,
+  horizontal = false,
 }: {
   x: number;
   y: number;
   size: number;
+  horizontal?: boolean;
 }): React.CSSProperties {
+  if (horizontal) {
+    return {
+      position: "fixed",
+      left: x,
+      top: y,
+      width: size,
+      height: 44,
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "0 12px",
+      borderRadius: 10,
+      background: "color-mix(in srgb, var(--bg-sidebar) 84%, white 16%)",
+      boxShadow: "0 12px 28px rgba(0,0,0,0.24)",
+      transform: "scale(1.05)",
+      pointerEvents: "none",
+      zIndex: 999,
+    };
+  }
   return {
     position: "fixed",
     left: x,

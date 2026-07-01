@@ -1,9 +1,8 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type React from "react";
 import type { Project } from "../../types";
 import { ProjectAvatar } from "../ProjectAvatar";
 import s from "../../styles";
-import { RAIL_ITEM_SIZE } from "../../styles/rail-drag";
 import claudeWaveGif from "../../assets/gif/claude-wave.gif";
 import type { ProjectStatus } from "./activity";
 
@@ -63,21 +62,11 @@ export const RailItem = memo(function RailItem({
 }) {
   const [hov, setHov] = useState(false);
   const [waving, setWaving] = useState(false);
-  const [showTip, setShowTip] = useState(false);
-  const tipTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const handleMouseEnter = () => {
-    setHov(true);
-    tipTimer.current = setTimeout(() => setShowTip(true), 400);
-  };
-  const handleMouseLeave = () => {
-    setHov(false);
-    setShowTip(false);
-    clearTimeout(tipTimer.current);
-  };
+  const handleMouseEnter = () => setHov(true);
+  const handleMouseLeave = () => setHov(false);
 
   // waveNonce 每次递增(出现新的待确认任务)就触发一次性招手,3.6s 后卸载。
-  // 卸载+重新挂载可让 gif 从首帧重播,同时重启 CSS 探头/缩回动画。
   useEffect(() => {
     if (waveNonce <= 0) return;
     setWaving(true);
@@ -85,58 +74,67 @@ export const RailItem = memo(function RailItem({
     return () => clearTimeout(id);
   }, [waveNonce]);
 
-  // outline 颜色保持瞬变(与旧版本一致 — 加 transition 后切 active 会看到 ~120ms 的
-  // 颜色过渡,视觉上"框慢半拍稳定"。transform / opacity 仍需平滑过渡。
-  const transition = "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), opacity 100ms";
+  const transition = "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), opacity 100ms, background 100ms";
 
   return (
-    <div style={{ position: "relative" }}>
-      <button
-        data-rail-id={project.id}
-        onClick={() => onClick(project)}
-        onPointerDown={(event) => onPointerDown(project, event)}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        className={isActive ? "rail-active" : undefined}
-        style={{
-          position: "relative",
-          width: RAIL_ITEM_SIZE,
-          height: RAIL_ITEM_SIZE,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: isActive
-            ? "var(--accent-subtle)"
-            : hov
-              ? "var(--bg-hover)"
-              : "none",
-          border: "none",
-          borderRadius: 12,
-          cursor: isDragging ? "grabbing" : isActive ? "grab" : "pointer",
-          padding: 0,
-          outline: isActive
-            ? "2px solid var(--accent)"
-            : hov
-              ? "2px solid var(--border-medium)"
-              : "2px solid transparent",
-          outlineOffset: 1,
-          transition,
-          transform: `translate3d(0, ${translateY}px, 0)`,
-          opacity: isDragging ? 0.18 : 1,
-          touchAction: "none",
-          userSelect: "none",
-          willChange: translateY !== 0 || isDragging ? "transform" : undefined,
-        }}
-      >
-        {waving && (
-          <img
-            key={waveNonce}
-            src={claudeWaveGif}
-            alt=""
-            className="rail-mascot-wave"
-            style={s.railMascot}
-          />
-        )}
+    <button
+      data-rail-id={project.id}
+      onClick={() => onClick(project)}
+      onPointerDown={(event) => onPointerDown(project, event)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className={isActive ? "rail-active" : undefined}
+      style={{
+        position: "relative",
+        width: "100%",
+        height: 44,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "0 12px",
+        background: isActive
+          ? "var(--conversation-active-bg, var(--accent-subtle))"
+          : hov
+            ? "var(--bg-hover)"
+            : "none",
+        border: "none",
+        borderRadius: 0,
+        cursor: isDragging ? "grabbing" : isActive ? "default" : "pointer",
+        transition,
+        transform: `translate3d(0, ${translateY}px, 0)`,
+        opacity: isDragging ? 0.18 : 1,
+        touchAction: "none",
+        userSelect: "none",
+        willChange: translateY !== 0 || isDragging ? "transform" : undefined,
+        textAlign: "left",
+      }}
+    >
+      {/* active indicator bar */}
+      {isActive && (
+        <span
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 8,
+            bottom: 8,
+            width: 3,
+            borderRadius: 3,
+            background: "var(--conversation-active-bar, var(--accent))",
+          }}
+        />
+      )}
+      {/* mascot wave */}
+      {waving && (
+        <img
+          key={waveNonce}
+          src={claudeWaveGif}
+          alt=""
+          className="rail-mascot-wave"
+          style={s.railMascot}
+        />
+      )}
+      {/* project avatar with status */}
+      <div style={{ position: "relative", flexShrink: 0 }}>
         <ProjectAvatar name={project.name} size={32} style={s.railAvatarStacked} />
         <AttentionIndicator
           status={status}
@@ -144,37 +142,43 @@ export const RailItem = memo(function RailItem({
           showBadge={showBadge}
           borderColor="var(--bg-sidebar)"
         />
-      </button>
-      {/* hover tooltip: project name + status summary */}
-      {showTip && !isDragging && (
-        <div
+      </div>
+      {/* project name */}
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontSize: 13,
+          fontWeight: isActive ? 600 : 500,
+          color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {project.name}
+      </span>
+      {/* attention count badge (right side) */}
+      {showBadge && attentionCount > 0 && (
+        <span
           style={{
-            position: "absolute",
-            left: "100%",
-            top: "50%",
-            transform: "translateY(-50%)",
-            marginLeft: 8,
-            padding: "5px 10px",
-            borderRadius: 6,
-            background: "var(--bg-panel, #fff)",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
-            border: "1px solid var(--border-dim)",
-            fontSize: 12,
-            fontWeight: 500,
-            color: "var(--text-primary)",
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-            zIndex: 1000,
+            flexShrink: 0,
+            minWidth: 18,
+            height: 18,
+            padding: "0 5px",
+            borderRadius: 9,
+            background: "var(--color-danger, #dc2626)",
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 700,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {project.name}
-          {attentionCount > 0 && (
-            <span style={{ marginLeft: 6, color: "var(--color-warning, #d97706)" }}>
-              {attentionCount} 待确认
-            </span>
-          )}
-        </div>
+          {attentionCount > 99 ? "99+" : attentionCount}
+        </span>
       )}
-    </div>
+    </button>
   );
 });

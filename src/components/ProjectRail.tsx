@@ -2,20 +2,17 @@ import { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import type { Project, Task } from "../types";
 import { ProjectAvatar } from "./ProjectAvatar";
 import {
-  RAIL_ITEM_SIZE,
-  RAIL_ITEM_GAP,
   RAIL_ITEM_STRIDE,
   railDragPreviewAvatarWrap,
   railDragPreviewStyle,
 } from "../styles/rail-drag";
 import {
-  EMPTY_PROJECT_ACTIVITY,
   buildProjectActivityMap,
   getProjectActivity,
 } from "./project-rail/activity";
 import { ProjectDrawer } from "./project-rail/ProjectDrawer";
 import { ProjectRailActions } from "./project-rail/ProjectRailActions";
-import { AttentionIndicator, RailItem } from "./project-rail/RailItem";
+import { RailItem } from "./project-rail/RailItem";
 import {
   RAIL_DRAG_THRESHOLD_PX,
   RAIL_PADDING_TOP,
@@ -256,10 +253,6 @@ export function ProjectRail({
     : -1;
   const draggedProject =
     dragOrigin && draggedVisibleIndex !== -1 ? railProjects[draggedVisibleIndex] : null;
-  const draggedProjectActivity = draggedProject
-    ? getProjectActivity(projectActivityById, draggedProject.id)
-    : EMPTY_PROJECT_ACTIVITY;
-
   // 招手触发:记录每个项目上一次的待确认数量,数量增加(0→≥1 或 n→n+1)时给该项目
   // 递增一个 nonce,RailItem 据此播一次招手动画。首帧只做初始化播种,不为已有任务招手。
   const prevAttentionRef = useRef<Map<string, number>>(new Map());
@@ -288,17 +281,15 @@ export function ProjectRail({
       ref={railContainerRef}
       style={{
         position: "relative",
-        width: 64,
+        width: 180,
         flexShrink: 0,
-        background: "var(--bg-sidebar)",
+        background: "var(--bg-sidebar, linear-gradient(180deg, var(--bg-sidebar), var(--bg-sidebar-elevated)))",
         borderRight: "1px solid var(--border-dim)",
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
         paddingTop: RAIL_PADDING_TOP,
         paddingBottom: 10,
-        gap: RAIL_ITEM_GAP,
-        overflow: "visible",
+        overflow: "hidden",
         zIndex: drawerOpen ? 50 : "auto",
       }}
     >
@@ -352,18 +343,16 @@ export function ProjectRail({
           style={railDragPreviewStyle({
             x: dragViz.previewX,
             y: dragViz.previewY,
-            size: RAIL_ITEM_SIZE,
+            size: 180,
+            horizontal: true,
           })}
         >
           <div style={railDragPreviewAvatarWrap}>
-            <ProjectAvatar name={draggedProject.name} size={28} />
-            <AttentionIndicator
-              status={draggedProjectActivity.status}
-              count={draggedProjectActivity.attentionCount}
-              showBadge={attentionBadge}
-              borderColor="var(--bg-sidebar)"
-            />
+            <ProjectAvatar name={draggedProject.name} size={32} />
           </div>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>
+            {draggedProject.name}
+          </span>
         </div>
       )}
     </div>

@@ -47,7 +47,7 @@ export function ProjectDrawer({
       ref={drawerRef}
       style={{
         position: "absolute",
-        left: 52,
+        left: 180,
         top: 0,
         bottom: 0,
         width: 220,
