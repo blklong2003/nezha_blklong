@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Project, Task, ProjectGroup } from "../types";
 import { ProjectAvatar } from "./ProjectAvatar";
 import {
-  RAIL_ITEM_STRIDE,
   railDragPreviewAvatarWrap,
   railDragPreviewStyle,
 } from "../styles/rail-drag";
@@ -227,11 +226,23 @@ export function ProjectRail({
 
       const container = railContainerRef.current;
       if (!container || !dragOrigin) return;
-      const rect = container.getBoundingClientRect();
-      const relativeY = event.clientY - rect.top - RAIL_PADDING_TOP;
-      const rawIndex = Math.round(relativeY / RAIL_ITEM_STRIDE);
-      const visibleLen = railProjectsRef.current.length;
-      const dropIndex = Math.max(0, Math.min(visibleLen, rawIndex));
+
+      // 通过 DOM 元素位置计算插入索引（适配分组结构）
+      const projectButtons = container.querySelectorAll<HTMLButtonElement>("[data-rail-id]");
+      let dropIndex = railProjectsRef.current.length;
+
+      for (let i = 0; i < projectButtons.length; i++) {
+        const btn = projectButtons[i];
+        const btnRect = btn.getBoundingClientRect();
+        const btnMidY = btnRect.top + btnRect.height / 2;
+        // 跳过正在拖拽的项目本身
+        const btnId = btn.dataset.railId;
+        if (btnId === dragOrigin.draggedId) continue;
+        if (event.clientY < btnMidY) {
+          dropIndex = i;
+          break;
+        }
+      }
 
       const nextViz: DragViz = {
         dropIndex,
