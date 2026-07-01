@@ -31,7 +31,6 @@ export function ProjectRail({
   attentionBadge = true,
   onSwitch,
   onCommitProjectOrder,
-  onOpen,
   singleProjectMode = false,
 }: {
   projects: Project[];
@@ -44,7 +43,6 @@ export function ProjectRail({
     beforeId: string | null,
     visibleIds: string[],
   ) => void;
-  onOpen: () => void;
   singleProjectMode?: boolean;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -324,7 +322,6 @@ export function ProjectRail({
         <ProjectRailActions
           drawerOpen={drawerOpen}
           onToggleDrawer={() => setDrawerOpen((v) => !v)}
-          onOpen={onOpen}
         />
       )}
 

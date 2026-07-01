@@ -1404,7 +1404,6 @@ function App() {
               onBack={handleBack}
               onSwitchProject={handleProjectClick}
               onCommitProjectOrder={handleCommitProjectOrder}
-              onOpen={handleOpen}
               themeVariant={themeVariant}
               themeMode={themeMode}
               systemPrefersDark={systemPrefersDark}
