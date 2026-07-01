@@ -637,12 +637,12 @@ function App() {
     });
     setActiveProject(project);
     mountProject(project.id);
-    updateProjectView(project.id, createDefaultProjectViewState());
     invoke("init_project_config", { projectPath: path }).catch((e: unknown) => {
       showToast(t("toast.initProjectConfigFailed", { error: String(e) }), "warning");
     });
 
     // 扫描历史会话文件，自动创建未追踪的任务
+    let autoSelectTaskId: string | null = null;
     try {
       const discovered = await invoke<Array<{ type: string; session_path: string; session_id: string; title: string }>>(
         "discover_project_sessions",
@@ -672,6 +672,9 @@ function App() {
             codexSessionId: s.type === "codex" ? s.session_id : undefined,
           }));
         if (newTasks.length > 0) {
+          // 选最新一条已发现任务作为默认视图，便于用户回顾历史会话
+          const lastDiscovered = newTasks[newTasks.length - 1];
+          autoSelectTaskId = lastDiscovered.id;
           setTasks((prev) => {
             const next = [...prev, ...newTasks];
             persistProjectTasks(project.id, next, showToast, formatSaveTasksError);
@@ -681,6 +684,13 @@ function App() {
       }
     } catch {
       // 扫描失败不影响主流程
+    }
+
+    // 如果自动发现了任务 → 默认显示最新会话（恢复历史对话）；否则回退到新建任务视图
+    if (autoSelectTaskId) {
+      updateProjectView(project.id, { selectedTaskId: autoSelectTaskId, isNewTask: false });
+    } else {
+      updateProjectView(project.id, createDefaultProjectViewState());
     }
   }
 

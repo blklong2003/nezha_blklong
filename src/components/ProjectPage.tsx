@@ -499,20 +499,51 @@ export function ProjectPage({
                 onRunTodo={onRunTodoTask}
                 onUpdateTodo={onUpdateTodo}
               />
-            ) : null}
+            ) : (
+              // 已完成/失败/运行中的任务：RunningView 作为前景内容渲染，
+              // 确保 flex 容器有内容撑开高度，会话视图和恢复按钮正常显示。
+              <RunningView
+                task={selectedTask}
+                projectPath={project.path}
+                runCount={taskRunCounts[selectedTask.id] ?? 0}
+                visible={visible && openFiles.length === 0 && !openDiff}
+                projectActive={visible}
+                onCancel={() => onCancelTask(selectedTask.id)}
+                onResume={() => onResumeTask(selectedTask.id)}
+                onRestartProvider={(pid) => onRestartProvider(selectedTask.id, pid)}
+                onMergeWorktree={() => onMergeWorktree(selectedTask.id)}
+                onDiscardWorktree={() => onDiscardWorktree(selectedTask.id)}
+                onReconnect={() => onReconnectTask(selectedTask.id)}
+                onMarkDone={() => onMarkTaskDone(selectedTask.id)}
+                onInput={(data) => onInput(selectedTask.id, data)}
+                onResize={(cols, rows) => onResize(selectedTask.id, cols, rows)}
+                onRegisterTerminal={(fn) => onRegisterTerminal(selectedTask.id, fn)}
+                onTerminalReady={(generation) => onTerminalReady(selectedTask.id, generation)}
+                onSnapshot={(snapshot) => onSnapshot(selectedTask.id, snapshot)}
+                getRestoreState={() => getTaskRestoreState(selectedTask.id)}
+                onRename={(name) => onRenameTask(selectedTask.id, name)}
+                onGenerateName={() => onGenerateTaskName(selectedTask.id)}
+                themeVariant={themeVariant}
+                terminalFontSize={terminalFontSize}
+                terminalScrollback={terminalScrollback}
+                monoFontFamily={monoFontFamily}
+              />
+            )}
           </ErrorBoundary>
 
-          {/* Background terminals */}
+          {/* Background terminals — 只保留运行中任务的终端 snapshot */}
           {projectTasks
-            .filter((t) => mountedTaskIds.has(t.id))
+            .filter((t) =>
+              mountedTaskIds.has(t.id) &&
+              (t.status === "pending" || t.status === "running" || t.status === "input_required"),
+            )
             .map((task) => {
               const isVisible =
                 openFiles.length === 0 &&
                 !openDiff &&
                 !isNewTask &&
                 !!selectedTask &&
-                task.id === selectedTaskId &&
-                task.status !== "todo";
+                task.id === selectedTaskId;
               return (
                 <RunningView
                   key={task.id}

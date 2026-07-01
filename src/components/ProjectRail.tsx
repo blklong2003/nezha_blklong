@@ -373,21 +373,24 @@ export function ProjectRail({
         if (viz.dropGroupId !== undefined) {
           onMoveToGroup(dragOrigin.draggedId, viz.dropGroupId);
         } else {
-          // 否则 → 调整项目顺序
-          const visible = railProjectsRef.current;
-          const draggedVisibleIdx = visible.findIndex((p) => p.id === dragOrigin.draggedId);
+          // 使用 DOM 顺序计算 visibleIds，确保与视觉显示顺序一致。
+          // railProjectsRef.current 是存储顺序，display 可能是分组排序后的 DOM 顺序，二者不同。
+          const container = railContainerRef.current;
+          const domButtons = container
+            ? Array.from(container.querySelectorAll<HTMLButtonElement>("[data-rail-id]"))
+            : [];
+          const visibleIds = domButtons
+            .map((b) => b.dataset.railId)
+            .filter((id): id is string => !!id);
+          const draggedVisibleIdx = visibleIds.indexOf(dragOrigin.draggedId);
           const dropIdx = viz.dropIndex;
           const noop =
             draggedVisibleIdx === -1 ||
             dropIdx === draggedVisibleIdx ||
             dropIdx === draggedVisibleIdx + 1;
           if (!noop) {
-            const beforeId = dropIdx < visible.length ? visible[dropIdx].id : null;
-            onCommitProjectOrder(
-              dragOrigin.draggedId,
-              beforeId,
-              visible.map((p) => p.id),
-            );
+            const beforeId = dropIdx < visibleIds.length ? visibleIds[dropIdx] : null;
+            onCommitProjectOrder(dragOrigin.draggedId, beforeId, visibleIds);
           }
         }
       }
