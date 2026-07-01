@@ -84,6 +84,7 @@ export function NewTaskView({
     immediate: boolean;
     launchMode: LaunchMode;
     baseBranch: string;
+    providerId?: string;
   }) => void;
   initialDraft?: NewTaskDraft | null;
   onCacheDraft?: (draft: NewTaskDraft | null) => void;
@@ -392,6 +393,7 @@ export function NewTaskView({
       immediate,
       launchMode,
       baseBranch,
+      providerId: providerId || undefined,
     });
     editorHandle.clear();
     setIsEmpty(true);

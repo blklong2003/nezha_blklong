@@ -132,6 +132,8 @@ export interface Task {
   additions?: number;
   /** 任务完成时计算的相对 baseBranch merge-base 的累计删除行数（仅 worktree 任务） */
   deletions?: number;
+  /** cc-switch provider ID：指定该任务使用的 API 服务商（env 变量注入） */
+  providerId?: string;
 }
 
 export const PERM_LABELS: Record<PermissionMode, string> = {

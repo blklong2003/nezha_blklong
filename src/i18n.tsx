@@ -115,6 +115,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "appSettings.remote.save": "Save",
     "appSettings.remote.portInvalid": "Port must be between 1024 and 65535.",
     "running.switchProvider": "Switch provider",
+    "running.switchProviderConfirm": "Switching provider requires restarting the task. Current conversation will be preserved in the session file. Continue?",
     "appSettings.syntaxHighlightUnavailable":
       "Syntax highlighting is unavailable. Showing plain text instead.",
     "appSettings.configFileNotFound": "Config file not found: {path}",
@@ -655,6 +656,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "appSettings.remote.save": "保存",
     "appSettings.remote.portInvalid": "端口必须在 1024-65535 之间。",
     "running.switchProvider": "切换服务商",
+    "running.switchProviderConfirm": "切换服务商需要重启任务，当前对话进度将保留在会话文件中。是否继续？",
     "appSettings.syntaxHighlightUnavailable": "语法高亮暂不可用，正在显示纯文本。",
     "appSettings.configFileNotFound": "未找到配置文件：{path}",
     "appSettings.sendMessage": "发送消息",

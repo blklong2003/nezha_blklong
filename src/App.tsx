@@ -650,6 +650,7 @@ function App() {
       prompt: task.prompt,
       agent: task.agent,
       permissionMode: task.permissionMode,
+      providerId: task.providerId ?? null,
       images,
       texts,
       cols: tm.terminalSizeRef.current.cols,
@@ -673,6 +674,7 @@ function App() {
       immediate,
       launchMode,
       baseBranch,
+      providerId,
     }: {
       prompt: string;
       agent: AgentType;
@@ -682,6 +684,7 @@ function App() {
       immediate: boolean;
       launchMode: "local" | "worktree";
       baseBranch: string;
+      providerId?: string;
     },
   ) {
     const taskId = `${Date.now()}`;
@@ -704,6 +707,7 @@ function App() {
       status: immediate ? "pending" : "todo",
       createdAt: now,
       updatedAt: now,
+      providerId: providerId || undefined,
     };
     setTasks((prev) => {
       const next = [baseTask, ...prev];
@@ -868,6 +872,7 @@ function App() {
       sessionId,
       prompt: task.prompt,
       permissionMode: task.permissionMode,
+      providerId: task.providerId ?? null,
       cols: tm.terminalSizeRef.current.cols,
       rows: tm.terminalSizeRef.current.rows,
       onOutput: tm.createOutputChannel(task.id),
@@ -909,6 +914,41 @@ function App() {
 
     pendingResumeStartsRef.current[taskId] = () => {
       invokeResumeTask(task, project, sessionId);
+    };
+  }
+
+  /** 切换服务商：取消当前任务并以新 providerId 重启（会话进度保留在 JSONL 中）。 */
+  function handleRestartProvider(taskId: string, newProviderId: string) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const project = projects.find((p) => p.id === task.projectId);
+    if (!project) return;
+
+    // 更新任务的 providerId
+    setTasks((prev) => {
+      const next = prev.map((t) => (t.id === taskId ? { ...t, providerId: newProviderId || undefined } : t));
+      persistProjectTasks(task.projectId, next, showToast, formatSaveTasksError);
+      return next;
+    });
+
+    // 取消当前运行中的进程
+    const projectPath = task.worktreePath ?? project.path;
+    invoke("cancel_task", { taskId, projectPath }).catch(() => {});
+
+    // 重置终端并重新运行
+    tm.resetTaskTerminal(taskId);
+    setTaskRunCounts((prev) => ({ ...prev, [taskId]: (prev[taskId] ?? 0) + 1 }));
+    setTasks((prev) => {
+      const next = prev.map((t) =>
+        t.id === taskId ? { ...t, status: "pending" as TaskStatus, updatedAt: Date.now() } : t,
+      );
+      persistProjectTasks(task.projectId, next, showToast, formatSaveTasksError);
+      return next;
+    });
+
+    pendingResumeStartsRef.current[taskId] = () => {
+      const updatedTask = { ...task, providerId: newProviderId || undefined };
+      invokeRunTask(updatedTask, projectPath, [], []);
     };
   }
 
@@ -1351,6 +1391,7 @@ function App() {
               onUpdateTodo={handleUpdateTodo}
               onCancelTask={handleCancelTask}
               onResumeTask={handleResumeTask}
+              onRestartProvider={handleRestartProvider}
               onMergeWorktree={handleMergeWorktree}
               onDiscardWorktree={handleDiscardWorktree}
               onReconnectTask={handleReconnectTask}

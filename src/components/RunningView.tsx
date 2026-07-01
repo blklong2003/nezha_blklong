@@ -91,6 +91,7 @@ export function RunningView({
   projectActive = true,
   onCancel,
   onResume,
+  onRestartProvider,
   onMergeWorktree,
   onDiscardWorktree,
   onReconnect,
@@ -115,6 +116,7 @@ export function RunningView({
   projectActive?: boolean;
   onCancel: () => void;
   onResume?: () => void;
+  onRestartProvider?: (providerId: string) => void;
   onMergeWorktree?: () => Promise<void>;
   onDiscardWorktree?: () => Promise<void>;
   onReconnect: () => void;
@@ -158,7 +160,6 @@ export function RunningView({
   const [worktreeBusy, setWorktreeBusy] = useState<"merge" | "discard" | null>(null);
   const [exporting, setExporting] = useState(false);
   const [bannerCompact, setBannerCompact] = useState(false);
-  const [providerId, setProviderId] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const interruptedBannerRef = useRef<HTMLDivElement>(null);
 
@@ -425,8 +426,14 @@ export function RunningView({
         </div>
         <ProviderSelector
           agent={task.agent}
-          providerId={providerId}
-          onSetProviderId={setProviderId}
+          providerId={task.providerId ?? ""}
+          onSetProviderId={(id) => {
+            if (id === (task.providerId ?? "")) return;
+            const msg = t("running.switchProviderConfirm");
+            if (window.confirm(msg)) {
+              onRestartProvider?.(id);
+            }
+          }}
         />
         {isActive && (
           <>
