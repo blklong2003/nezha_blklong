@@ -621,6 +621,47 @@ function App() {
     invoke("init_project_config", { projectPath: path }).catch((e: unknown) => {
       showToast(t("toast.initProjectConfigFailed", { error: String(e) }), "warning");
     });
+
+    // 扫描历史会话文件，自动创建未追踪的任务
+    try {
+      const discovered = await invoke<Array<{ type: string; session_path: string; session_id: string; title: string }>>(
+        "discover_project_sessions",
+        { projectPath: path },
+      );
+      if (discovered.length > 0) {
+        const existingPaths = new Set(
+          tasks
+            .filter((t) => t.projectId === project.id)
+            .flatMap((t) => [t.claudeSessionPath, t.codexSessionPath].filter(Boolean)),
+        );
+        const newTasks: Task[] = discovered
+          .filter((s) => !existingPaths.has(s.session_path))
+          .map((s, i) => ({
+            id: `${Date.now()}-discovered-${i}`,
+            projectId: project.id,
+            name: s.title,
+            prompt: s.title,
+            agent: s.type === "codex" ? "codex" : "claude",
+            permissionMode: "ask" as const,
+            status: "done" as TaskStatus,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            claudeSessionPath: s.type !== "codex" ? s.session_path : undefined,
+            claudeSessionId: s.type !== "codex" ? s.session_id : undefined,
+            codexSessionPath: s.type === "codex" ? s.session_path : undefined,
+            codexSessionId: s.type === "codex" ? s.session_id : undefined,
+          }));
+        if (newTasks.length > 0) {
+          setTasks((prev) => {
+            const next = [...prev, ...newTasks];
+            persistProjectTasks(project.id, next, showToast, formatSaveTasksError);
+            return next;
+          });
+        }
+      }
+    } catch {
+      // 扫描失败不影响主流程
+    }
   }
 
   function handleProjectClick(project: Project) {

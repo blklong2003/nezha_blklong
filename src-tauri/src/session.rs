@@ -765,6 +765,138 @@ pub async fn delete_project_sessions(project_id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 扫描项目中未被追踪的历史会话文件。
+/// 返回 JSON 数组，每项包含 { type, session_path, session_id, title }。
+#[tauri::command]
+pub async fn discover_project_sessions(project_path: String) -> Result<Vec<serde_json::Value>, String> {
+    let mut results: Vec<serde_json::Value> = Vec::new();
+    let mut seen_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    // 1) Claude 会话: ~/.claude/projects/<encoded>/*.jsonl
+    if let Some(claude_dir) = claude_sessions_dir_for_project(&project_path) {
+        if let Ok(entries) = std::fs::read_dir(&claude_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                    continue;
+                }
+                if let Some(path_str) = path.to_str() {
+                    if seen_paths.insert(path_str.to_string()) {
+                        let session_id = path
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let title = extract_session_title(path_str).unwrap_or_else(|| session_id.clone());
+                        results.push(serde_json::json!({
+                            "type": "claude",
+                            "session_path": path_str,
+                            "session_id": session_id,
+                            "title": title,
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
+    // 2) Codex 会话: <project>/.codex/sessions/ 和 ~/.codex/sessions/
+    for root in codex_sessions_roots(&project_path) {
+        if let Ok(entries) = std::fs::read_dir(&root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                    continue;
+                }
+                if let Some(path_str) = path.to_str() {
+                    // 只收集属于当前项目的会话（路径包含项目路径或全局目录）
+                    if path_str.contains(&project_path) || !path_str.contains('/') {
+                        if seen_paths.insert(path_str.to_string()) {
+                            let session_id = path
+                                .file_stem()
+                                .and_then(|s| s.to_str())
+                                .unwrap_or("")
+                                .to_string();
+                            results.push(serde_json::json!({
+                                "type": "codex",
+                                "session_path": path_str,
+                                "session_id": session_id,
+                                "title": session_id,
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3) Nezha 自定义会话: <project>/.nezha/sessions/*.jsonl
+    let nezha_sessions_dir = Path::new(&project_path).join(".nezha").join("sessions");
+    if let Ok(entries) = std::fs::read_dir(&nezha_sessions_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                continue;
+            }
+            if let Some(path_str) = path.to_str() {
+                if seen_paths.insert(path_str.to_string()) {
+                    let session_id = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let title = extract_session_title(path_str).unwrap_or_else(|| session_id.clone());
+                    results.push(serde_json::json!({
+                        "type": "claude",
+                        "session_path": path_str,
+                        "session_id": session_id,
+                        "title": title,
+                    }));
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// 从 JSONL 会话文件中提取标题（取第一行 user 消息的摘要或 custom-title）。
+fn extract_session_title(path: &str) -> Option<String> {
+    use std::io::BufRead;
+    let file = File::open(path).ok()?;
+    let reader = std::io::BufReader::new(file);
+    for line in reader.lines().take(50) {
+        let line = line.ok()?;
+        let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) else {
+            continue;
+        };
+        // Claude: 取 message.content 的 text 首行
+        if let Some(msg) = val.get("message") {
+            if let Some(content) = msg.get("content") {
+                if let Some(text) = content.as_str() {
+                    let trimmed = text.trim();
+                    if !trimmed.is_empty() {
+                        return Some(trimmed.chars().take(60).collect());
+                    }
+                }
+                if let Some(arr) = content.as_array() {
+                    for block in arr {
+                        if block.get("type").and_then(|v| v.as_str()) == Some("text") {
+                            if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
+                                let trimmed = text.trim();
+                                if !trimmed.is_empty() {
+                                    return Some(trimmed.chars().take(60).collect());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 fn is_codex_format(lines: &[&str]) -> bool {
     for line in lines.iter().take(10) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
