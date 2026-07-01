@@ -289,35 +289,36 @@ export function ProjectRail({
         flexDirection: "column",
         paddingTop: RAIL_PADDING_TOP,
         paddingBottom: 10,
-        overflow: "hidden",
+        overflow: "visible",
         zIndex: drawerOpen ? 50 : "auto",
       }}
     >
-      {railProjects.map((project, index) => {
-        const isDragging = dragOrigin?.draggedId === project.id;
-        const activity = getProjectActivity(projectActivityById, project.id);
-        const translateY =
-          dragOrigin && dragViz && draggedVisibleIndex !== -1
-            ? getRailItemTranslateY(index, draggedVisibleIndex, dragViz.dropIndex)
-            : 0;
-        return (
-          <RailItem
-            key={project.id}
-            project={project}
-            isActive={project.id === activeProjectId}
-            status={activity.status}
-            attentionCount={activity.attentionCount}
-            showBadge={attentionBadge}
-            waveNonce={waveNonces.get(project.id) ?? 0}
-            isDragging={isDragging}
-            translateY={translateY}
-            onPointerDown={handleRailItemPointerDown}
-            onClick={handleRailItemClick}
-          />
-        );
-      })}
-
-      <div style={{ flex: 1 }} />
+      {/* Scrollable project list */}
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", minHeight: 0 }}>
+        {railProjects.map((project, index) => {
+          const isDragging = dragOrigin?.draggedId === project.id;
+          const activity = getProjectActivity(projectActivityById, project.id);
+          const translateY =
+            dragOrigin && dragViz && draggedVisibleIndex !== -1
+              ? getRailItemTranslateY(index, draggedVisibleIndex, dragViz.dropIndex)
+              : 0;
+          return (
+            <RailItem
+              key={project.id}
+              project={project}
+              isActive={project.id === activeProjectId}
+              status={activity.status}
+              attentionCount={activity.attentionCount}
+              showBadge={attentionBadge}
+              waveNonce={waveNonces.get(project.id) ?? 0}
+              isDragging={isDragging}
+              translateY={translateY}
+              onPointerDown={handleRailItemPointerDown}
+              onClick={handleRailItemClick}
+            />
+          );
+        })}
+      </div>
 
       {!singleProjectMode && (
         <ProjectRailActions
