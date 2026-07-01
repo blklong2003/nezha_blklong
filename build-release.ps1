@@ -69,9 +69,15 @@ Set-ItemProperty -Path $regPath -Name $regName -Value $newExe.FullName
 Write-Host "Autostart registry updated: $regName → $($newExe.FullName)" -ForegroundColor Green
 
 # ---- 5.5 Retain last N versions, delete older ----
+# Sort by numeric version parts (not string) so .10 > .9
 $keepCount = 3
 $allVersions = Get-ChildItem -Path $targetDir -Filter "nezha-v*-my.exe" |
-  Sort-Object { $_.BaseName -replace '^nezha-v', '' -replace '-my$','' } -Descending
+  Sort-Object {
+    $verStr = $_.BaseName -replace '^nezha-v', '' -replace '-my$',''
+    $parts = $verStr -split '\.'
+    # Pad each part to 4 digits for proper string sorting ("0010" > "0009")
+    ($parts | ForEach-Object { $_.PadLeft(4, '0') }) -join '.'
+  } -Descending
 if ($allVersions.Count -gt $keepCount) {
   $toDelete = $allVersions[$keepCount..($allVersions.Count - 1)]
   foreach ($f in $toDelete) {
