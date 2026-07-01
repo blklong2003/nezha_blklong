@@ -14,6 +14,8 @@ export type DragViz = {
   dropIndex: number;
   previewX: number;
   previewY: number;
+  // 如果拖拽到分组头上方，记录目标分组 ID
+  dropGroupId?: string | null;
 };
 
 // 让位 transform:dragged 自己不动(用 DragPreview 跟手指),

@@ -66,6 +66,7 @@ export function ProjectPage({
   onBack,
   onSwitchProject,
   onCommitProjectOrder,
+  onMoveToGroup,
   onOpen,
   saveNewTaskDraft,
   getNewTaskDraft,
@@ -145,6 +146,7 @@ export function ProjectPage({
     beforeId: string | null,
     visibleIds: string[],
   ) => void;
+  onMoveToGroup: (projectId: string, groupId: string | null) => void;
   onOpen: () => void;
   saveNewTaskDraft: (projectId: string, draft: any) => void;
   getNewTaskDraft: (projectId: string) => any;
@@ -351,6 +353,7 @@ export function ProjectPage({
         attentionBadge={attentionBadge}
         onSwitch={onSwitchProject}
         onCommitProjectOrder={onCommitProjectOrder}
+        onMoveToGroup={onMoveToGroup}
         onOpen={onOpen}
         singleProjectMode={hubMode}
       />

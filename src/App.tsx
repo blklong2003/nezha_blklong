@@ -1338,6 +1338,20 @@ function App() {
     [showToast, formatSaveProjectsError],
   );
 
+  /** 移动项目到分组 */
+  const handleMoveToGroup = useCallback(
+    (projectId: string, groupId: string | null) => {
+      setProjects((prev) => {
+        const next = prev.map((p) =>
+          p.id === projectId ? { ...p, groupId: groupId || undefined } : p,
+        );
+        persistProjects(next, showToast, formatSaveProjectsError);
+        return next;
+      });
+    },
+    [showToast, formatSaveProjectsError],
+  );
+
   function updateTaskStatus(
     taskId: string,
     status: TaskStatus,
@@ -1510,6 +1524,7 @@ function App() {
               onBack={handleBack}
               onSwitchProject={handleProjectClick}
               onCommitProjectOrder={handleCommitProjectOrder}
+              onMoveToGroup={handleMoveToGroup}
               onOpen={handleOpen}
               saveNewTaskDraft={saveNewTaskDraft}
               getNewTaskDraft={getNewTaskDraft}

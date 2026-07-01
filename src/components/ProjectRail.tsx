@@ -30,6 +30,7 @@ export function ProjectRail({
   attentionBadge = true,
   onSwitch,
   onCommitProjectOrder,
+  onMoveToGroup,
   onOpen,
   singleProjectMode = false,
 }: {
@@ -43,6 +44,7 @@ export function ProjectRail({
     beforeId: string | null,
     visibleIds: string[],
   ) => void;
+  onMoveToGroup: (projectId: string, groupId: string | null) => void;
   onOpen: () => void;
   singleProjectMode?: boolean;
 }) {
@@ -244,10 +246,22 @@ export function ProjectRail({
         }
       }
 
+      // 检测是否悬停在分组头上
+      let dropGroupId: string | null | undefined;
+      const groupHeaders = container.querySelectorAll<HTMLElement>("[data-group-id]");
+      for (const header of groupHeaders) {
+        const rect = header.getBoundingClientRect();
+        if (event.clientY >= rect.top && event.clientY <= rect.bottom) {
+          dropGroupId = header.dataset.groupId || null;
+          break;
+        }
+      }
+
       const nextViz: DragViz = {
         dropIndex,
         previewX: event.clientX - dragOrigin.offsetX,
         previewY: event.clientY - dragOrigin.offsetY,
+        dropGroupId,
       };
       scheduleDragViz(nextViz);
     }
@@ -259,20 +273,26 @@ export function ProjectRail({
       const moved = dragMovedRef.current;
       const viz = dragVizRef.current;
       if (moved && viz && dragOrigin) {
-        const visible = railProjectsRef.current;
-        const draggedVisibleIdx = visible.findIndex((p) => p.id === dragOrigin.draggedId);
-        const dropIdx = viz.dropIndex;
-        const noop =
-          draggedVisibleIdx === -1 ||
-          dropIdx === draggedVisibleIdx ||
-          dropIdx === draggedVisibleIdx + 1;
-        if (!noop) {
-          const beforeId = dropIdx < visible.length ? visible[dropIdx].id : null;
-          onCommitProjectOrder(
-            dragOrigin.draggedId,
-            beforeId,
-            visible.map((p) => p.id),
-          );
+        // 如果拖放到分组头 → 移动项目到该分组
+        if (viz.dropGroupId !== undefined) {
+          onMoveToGroup(dragOrigin.draggedId, viz.dropGroupId);
+        } else {
+          // 否则 → 调整项目顺序
+          const visible = railProjectsRef.current;
+          const draggedVisibleIdx = visible.findIndex((p) => p.id === dragOrigin.draggedId);
+          const dropIdx = viz.dropIndex;
+          const noop =
+            draggedVisibleIdx === -1 ||
+            dropIdx === draggedVisibleIdx ||
+            dropIdx === draggedVisibleIdx + 1;
+          if (!noop) {
+            const beforeId = dropIdx < visible.length ? visible[dropIdx].id : null;
+            onCommitProjectOrder(
+              dragOrigin.draggedId,
+              beforeId,
+              visible.map((p) => p.id),
+            );
+          }
         }
       }
       const pointerId = activePointerIdRef.current;
@@ -466,6 +486,7 @@ export function ProjectRail({
               {/* 分组头 */}
               {group && (
                 <button
+                  data-group-id={group.id}
                   onClick={() => toggleGroup(group.id)}
                   style={{
                     width: "100%",
@@ -473,8 +494,9 @@ export function ProjectRail({
                     alignItems: "center",
                     gap: 4,
                     padding: "6px 14px 4px",
-                    background: "none",
+                    background: dragViz?.dropGroupId === group.id ? "var(--accent-subtle)" : "none",
                     border: "none",
+                    borderRadius: 6,
                     cursor: "pointer",
                     fontSize: 11,
                     fontWeight: 600,
@@ -482,10 +504,14 @@ export function ProjectRail({
                     textTransform: "uppercase",
                     letterSpacing: "0.5px",
                     textAlign: "left",
-                    transition: "color 0.15s ease",
+                    transition: "background 0.15s ease, color 0.15s ease",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-hint)")}
+                  onMouseEnter={(e) => {
+                    if (dragViz?.dropGroupId !== group.id) e.currentTarget.style.color = "var(--text-secondary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (dragViz?.dropGroupId !== group.id) e.currentTarget.style.color = "var(--text-hint)";
+                  }}
                   title={isCollapsed ? "展开分组" : "折叠分组"}
                 >
                   <span style={{ fontSize: 8, transform: isCollapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s ease" }}>
