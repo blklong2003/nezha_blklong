@@ -1,8 +1,8 @@
 import type React from "react";
 
-// RailItem 的尺寸与项间距来自 ProjectRail 的视觉规范:item 44px、container gap 6px。
+// RailItem 的尺寸与项间距来自 ProjectRail 的视觉规范:item 48px、container gap 6px。
 // 拖拽时让位距离 = item + gap,改这里需要同步 ProjectRail 的对应字段。
-export const RAIL_ITEM_SIZE = 44;
+export const RAIL_ITEM_SIZE = 48;
 export const RAIL_ITEM_GAP = 6;
 export const RAIL_ITEM_STRIDE = RAIL_ITEM_SIZE + RAIL_ITEM_GAP;
 
@@ -26,7 +26,7 @@ export function railDragPreviewStyle({
       left: x,
       top: y,
       width: size,
-      height: 44,
+      height: 48,
       display: "flex",
       alignItems: "center",
       gap: 10,

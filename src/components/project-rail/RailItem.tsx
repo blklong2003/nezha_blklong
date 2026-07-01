@@ -87,11 +87,11 @@ export const RailItem = memo(function RailItem({
       style={{
         position: "relative",
         width: "100%",
-        height: 44,
+        height: 48,
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "0 12px",
+        padding: "0 14px",
         background: isActive
           ? "var(--conversation-active-bg, var(--accent-subtle))"
           : hov
@@ -115,11 +115,12 @@ export const RailItem = memo(function RailItem({
           style={{
             position: "absolute",
             left: 0,
-            top: 8,
-            bottom: 8,
+            top: 10,
+            bottom: 10,
             width: 3,
-            borderRadius: 3,
+            borderRadius: 2,
             background: "var(--conversation-active-bar, var(--accent))",
+            boxShadow: "0 0 4px var(--conversation-active-bar, var(--accent))",
           }}
         />
       )}
@@ -135,7 +136,7 @@ export const RailItem = memo(function RailItem({
       )}
       {/* project avatar with status */}
       <div style={{ position: "relative", flexShrink: 0 }}>
-        <ProjectAvatar name={project.name} size={32} style={s.railAvatarStacked} />
+        <ProjectAvatar name={project.name} size={30} style={s.railAvatarStacked} />
         <AttentionIndicator
           status={status}
           count={attentionCount}
@@ -148,12 +149,13 @@ export const RailItem = memo(function RailItem({
         style={{
           flex: 1,
           minWidth: 0,
-          fontSize: 13,
+          fontSize: 13.5,
           fontWeight: isActive ? 600 : 500,
           color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
+          lineHeight: 1.3,
         }}
       >
         {project.name}
