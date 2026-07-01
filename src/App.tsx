@@ -151,11 +151,22 @@ function reorderProjects(
 interface ProjectViewState {
   selectedTaskId: string | null;
   isNewTask: boolean;
+  taskPanelCollapsed: boolean;
 }
 
 function createDefaultProjectViewState(): ProjectViewState {
-  return { selectedTaskId: null, isNewTask: true };
+  return { selectedTaskId: null, isNewTask: true, taskPanelCollapsed: false };
 }
+
+// 跨项目保留的新任务草稿 (projectId → draft)
+const gNewTaskDrafts = new Map<string, {
+  promptHtml: string;
+  agent: string;
+  permMode: string;
+  planMode: boolean;
+  pastedImages: string[];
+  pastedTexts: { text: string }[];
+} | null>();
 
 function normalizeInterruptedTasksOnStartup(
   tasks: Task[],
@@ -321,6 +332,14 @@ function App() {
 
   const mountProject = useCallback((projectId: string) => {
     setMountedProjectIds((prev) => (prev.includes(projectId) ? prev : [...prev, projectId]));
+  }, []);
+
+  // 保存/恢复新任务草稿（跨项目切换时保留）
+  const saveNewTaskDraft = useCallback((projectId: string, draft: typeof gNewTaskDrafts extends Map<string, infer V> ? V : never) => {
+    gNewTaskDrafts.set(projectId, draft);
+  }, []);
+  const getNewTaskDraft = useCallback((projectId: string) => {
+    return gNewTaskDrafts.get(projectId) ?? null;
   }, []);
 
   const updateProjectView = useCallback((projectId: string, patch: Partial<ProjectViewState>) => {
@@ -1446,6 +1465,12 @@ function App() {
               onSwitchProject={handleProjectClick}
               onCommitProjectOrder={handleCommitProjectOrder}
               onOpen={handleOpen}
+              saveNewTaskDraft={saveNewTaskDraft}
+              getNewTaskDraft={getNewTaskDraft}
+              taskPanelCollapsed={getProjectView(project.id).taskPanelCollapsed}
+              onTaskPanelCollapsedChange={(collapsed) =>
+                updateProjectView(project.id, { taskPanelCollapsed: collapsed })
+              }
               themeVariant={themeVariant}
               themeMode={themeMode}
               systemPrefersDark={systemPrefersDark}

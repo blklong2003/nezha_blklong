@@ -67,6 +67,10 @@ export function ProjectPage({
   onSwitchProject,
   onCommitProjectOrder,
   onOpen,
+  saveNewTaskDraft,
+  getNewTaskDraft,
+  taskPanelCollapsed,
+  onTaskPanelCollapsedChange,
   themeVariant,
   themeMode,
   systemPrefersDark,
@@ -141,6 +145,10 @@ export function ProjectPage({
     visibleIds: string[],
   ) => void;
   onOpen: () => void;
+  saveNewTaskDraft: (projectId: string, draft: any) => void;
+  getNewTaskDraft: (projectId: string) => any;
+  taskPanelCollapsed?: boolean;
+  onTaskPanelCollapsedChange?: (collapsed: boolean) => void;
   themeVariant: ThemeVariant;
   themeMode: ThemeMode;
   systemPrefersDark: boolean;
@@ -190,12 +198,18 @@ export function ProjectPage({
   const [showShellTerminal, setShowShellTerminal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFileSearch, setShowFileSearch] = useState(false);
-  const [taskPanelCollapsed, setTaskPanelCollapsed] = useState(false);
   const [mountedTaskIds, setMountedTaskIds] = useState<Set<string>>(() => new Set());
   const shellRef = useRef<ShellTerminalPanelHandle>(null);
   const pendingCmdRef = useRef<string | null>(null);
   const prevHadDiffRef = useRef(false);
   const newTaskDraftRef = useRef<NewTaskDraft | null>(null);
+  // 任务面板折叠状态 — 使用 props（由 App 级别的 state 持久化）
+  const [taskPanelCollapsedLocal, setLocal] = useState(taskPanelCollapsed ?? false);
+  const setTaskPanelCollapsed = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof v === 'boolean' ? v : v(taskPanelCollapsedLocal);
+    setLocal(next);
+    onTaskPanelCollapsedChange?.(next);
+  }, [taskPanelCollapsedLocal, onTaskPanelCollapsedChange]);
   const handleCacheNewTaskDraft = useCallback((draft: NewTaskDraft | null) => {
     newTaskDraftRef.current = draft;
   }, []);
@@ -271,9 +285,13 @@ export function ProjectPage({
   }, []);
 
   const handleNewTask = useCallback(() => {
+    // 保存当前草稿到全局缓存
+    if (newTaskDraftRef.current) {
+      saveNewTaskDraft(project.id, newTaskDraftRef.current);
+    }
     clearFileAndDiff();
     onNewTask();
-  }, [onNewTask, clearFileAndDiff]);
+  }, [onNewTask, clearFileAndDiff, project.id, saveNewTaskDraft]);
 
   const collapseTaskPanelForNewDiff = useCallback(() => {
     if (!openDiff) {
@@ -451,8 +469,12 @@ export function ProjectPage({
                 project={project}
                 otherProjects={otherProjects}
                 onSubmit={onSubmitTask}
-                initialDraft={newTaskDraftRef.current}
-                onCacheDraft={handleCacheNewTaskDraft}
+                initialDraft={getNewTaskDraft(project.id) ?? newTaskDraftRef.current}
+                onCacheDraft={(draft) => {
+                  newTaskDraftRef.current = draft;
+                  saveNewTaskDraft(project.id, draft);
+                  handleCacheNewTaskDraft(draft);
+                }}
               />
             ) : selectedTask.status === ("todo" as TaskStatus) ? (
               <TodoTaskView
