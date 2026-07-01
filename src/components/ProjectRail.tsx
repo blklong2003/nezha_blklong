@@ -156,90 +156,72 @@ export function ProjectRail({
     [],
   );
 
-  const handleGroupDragStart = useCallback((e: React.PointerEvent, groupId: string) => {
-    // 如果点击的是展开/折叠箭头区域，不触发拖拽
-    if (e.target instanceof HTMLElement && e.target.closest("[data-toggle]")) return;
-    e.preventDefault();
-    setDraggingGroupId(groupId);
-  }, []);
+  const groupDraggingRef = useRef<string | null>(null);
 
-  const groupDropTargetRef = useRef<string | null>(null);
+  const handleGroupDragStart = useCallback((_e: React.PointerEvent, groupId: string) => {
+    groupDraggingRef.current = groupId;
 
-  const handleGroupMove = useCallback(
-    (e: PointerEvent) => {
-      if (!draggingGroupId) return;
+    // 闭包变量，跨 handleMove / handleUp 同步记录最终 drop 目标
+    let lastDropTarget: string | null = null;
+
+    const handleMove = (moveEvent: PointerEvent) => {
       const container = railContainerRef.current;
       if (!container) return;
 
-      // 找到鼠标下方的分组头
       const headers = Array.from(container.querySelectorAll<HTMLElement>("[data-group-id]"));
       let targetId: string | null = null;
 
       for (const header of headers) {
         const rect = header.getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
-        // 跳过正在拖拽的分组本身
-        if (header.dataset.groupId === draggingGroupId) continue;
-        if (e.clientY < midY) {
+        if (header.dataset.groupId === groupId) continue;
+        if (moveEvent.clientY < midY) {
           targetId = header.dataset.groupId || null;
           break;
         }
       }
 
-      // 如果没有找到目标（鼠标在最下面），放到最后一个分组之后
       if (!targetId && headers.length > 1) {
         const sortedGroups = [...groups].sort((a, b) => a.order - b.order);
         const lastGroup = sortedGroups[sortedGroups.length - 1];
-        if (lastGroup && lastGroup.id !== draggingGroupId) {
+        if (lastGroup && lastGroup.id !== groupId) {
           targetId = lastGroup.id;
         }
       }
 
-      groupDropTargetRef.current = targetId;
+      lastDropTarget = targetId;
       setGroupDropTarget(targetId);
-    },
-    [draggingGroupId, groups],
-  );
+    };
 
-  const handleGroupDrop = useCallback(() => {
-    const dropTarget = groupDropTargetRef.current;
-    if (!draggingGroupId || !dropTarget || draggingGroupId === dropTarget) {
+    const handleUp = () => {
+      const dropTarget = lastDropTarget;
+      document.removeEventListener("pointermove", handleMove);
+      document.removeEventListener("pointerup", handleUp);
+
+      if (dropTarget && groupId !== dropTarget) {
+        setGroups((prev) => {
+          const sorted = [...prev].sort((a, b) => a.order - b.order);
+          const dragIdx = sorted.findIndex((g) => g.id === groupId);
+          const dropIdx = sorted.findIndex((g) => g.id === dropTarget);
+          if (dragIdx === -1 || dropIdx === -1) return prev;
+
+          const [removed] = sorted.splice(dragIdx, 1);
+          sorted.splice(dropIdx, 0, removed);
+
+          const updated = sorted.map((g, i) => ({ ...g, order: i }));
+          invoke("save_project_groups", { groups: updated }).catch(() => {});
+          return updated;
+        });
+      }
+
+      groupDraggingRef.current = null;
       setDraggingGroupId(null);
       setGroupDropTarget(null);
-      return;
-    }
-
-    // 重新排序分组
-    setGroups((prev) => {
-      const sorted = [...prev].sort((a, b) => a.order - b.order);
-      const dragIdx = sorted.findIndex((g) => g.id === draggingGroupId);
-      const dropIdx = sorted.findIndex((g) => g.id === dropTarget);
-      if (dragIdx === -1 || dropIdx === -1) return prev;
-
-      const [removed] = sorted.splice(dragIdx, 1);
-      sorted.splice(dropIdx, 0, removed);
-
-      // 更新 order 字段
-      const updated = sorted.map((g, i) => ({ ...g, order: i }));
-      invoke("save_project_groups", { groups: updated }).catch(() => {});
-      return updated;
-    });
-
-    setDraggingGroupId(null);
-    setGroupDropTarget(null);
-  }, [draggingGroupId]); // use ref for drop target to avoid stale closure
-
-  useEffect(() => {
-    if (!draggingGroupId) return;
-    const move = (e: PointerEvent) => handleGroupMove(e);
-    const up = () => handleGroupDrop();
-    document.addEventListener("pointermove", move);
-    document.addEventListener("pointerup", up);
-    return () => {
-      document.removeEventListener("pointermove", move);
-      document.removeEventListener("pointerup", up);
     };
-  }, [draggingGroupId, handleGroupMove, handleGroupDrop]);
+
+    document.addEventListener("pointermove", handleMove);
+    document.addEventListener("pointerup", handleUp);
+  }, [groups]);
 
   // 按分组整理项目
   const groupedProjects = useMemo(() => {
