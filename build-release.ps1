@@ -71,16 +71,12 @@ Write-Host "Autostart registry updated: $regName → $($newExe.FullName)" -Foreg
 # ---- 5.5 Retain last N versions, delete older ----
 $keepCount = 3
 $allVersions = Get-ChildItem -Path $targetDir -Filter "nezha-v*-my.exe" |
-  ForEach-Object {
-    $verStr = $_.BaseName -replace '^nezha-v', '' -replace '-my$',''
-    [PSCustomObject]@{ File = $_; Version = $verStr; Parts = ($verStr -split '\.') | ForEach-Object { [int]$_ } }
-  } |
-  Sort-Object { $_.Parts[0] }, { $_.Parts[1] }, { $_.Parts[2] }, { $_.Parts[3] } -Descending
+  Sort-Object { $_.BaseName -replace '^nezha-v', '' -replace '-my$','' } -Descending
 if ($allVersions.Count -gt $keepCount) {
   $toDelete = $allVersions[$keepCount..($allVersions.Count - 1)]
   foreach ($f in $toDelete) {
-    Remove-Item $f.File.FullName -Force
-    Write-Host "Pruned old version: $($f.File.Name)" -ForegroundColor DarkGray
+    Remove-Item $f.FullName -Force
+    Write-Host "Pruned old version: $($f.Name)" -ForegroundColor DarkGray
   }
 }
 Write-Host "Kept last $keepCount versions" -ForegroundColor Green
