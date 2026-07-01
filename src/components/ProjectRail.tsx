@@ -125,7 +125,77 @@ export function ProjectRail({
 
   const closeContextMenu = useCallback(() => setCtxMenu(null), []);
 
-  // 移动项目到分组 — TODO: 实现分组移动逻辑
+  // 分组拖拽重排序状态
+  const [draggingGroupId, setDraggingGroupId] = useState<string | null>(null);
+  const [groupDropTarget, setGroupDropTarget] = useState<string | null>(null);
+
+  const handleGroupDragStart = useCallback((e: React.PointerEvent, groupId: string) => {
+    // 如果点击的是展开/折叠箭头区域，不触发拖拽
+    if (e.target instanceof HTMLElement && e.target.closest("[data-toggle]")) return;
+    e.preventDefault();
+    setDraggingGroupId(groupId);
+  }, []);
+
+  const handleGroupMove = useCallback(
+    (e: PointerEvent) => {
+      if (!draggingGroupId) return;
+      const container = railContainerRef.current;
+      if (!container) return;
+
+      // 找到鼠标下方的分组头
+      const headers = container.querySelectorAll<HTMLElement>("[data-group-id]");
+      let targetId: string | null = null;
+      for (const header of headers) {
+        const rect = header.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (e.clientY < midY) {
+          targetId = header.dataset.groupId || null;
+          break;
+        }
+      }
+      setGroupDropTarget(targetId);
+    },
+    [draggingGroupId],
+  );
+
+  const handleGroupDrop = useCallback(() => {
+    if (!draggingGroupId || !groupDropTarget || draggingGroupId === groupDropTarget) {
+      setDraggingGroupId(null);
+      setGroupDropTarget(null);
+      return;
+    }
+
+    // 重新排序分组
+    setGroups((prev) => {
+      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const dragIdx = sorted.findIndex((g) => g.id === draggingGroupId);
+      const dropIdx = sorted.findIndex((g) => g.id === groupDropTarget);
+      if (dragIdx === -1 || dropIdx === -1) return prev;
+
+      const [removed] = sorted.splice(dragIdx, 1);
+      sorted.splice(dropIdx, 0, removed);
+
+      // 更新 order 字段
+      const updated = sorted.map((g, i) => ({ ...g, order: i }));
+      invoke("save_project_groups", { groups: updated }).catch(() => {});
+      return updated;
+    });
+
+    setDraggingGroupId(null);
+    setGroupDropTarget(null);
+  }, [draggingGroupId, groupDropTarget]);
+
+  useEffect(() => {
+    if (!draggingGroupId) return;
+    const move = (e: PointerEvent) => handleGroupMove(e);
+    const up = () => handleGroupDrop();
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+    return () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+    };
+  }, [draggingGroupId, handleGroupMove, handleGroupDrop]);
 
   // 按分组整理项目
   const groupedProjects = useMemo(() => {
@@ -485,43 +555,68 @@ export function ProjectRail({
             <div key={group?.id ?? "__ungrouped__"}>
               {/* 分组头 */}
               {group && (
-                <button
+                <div
                   data-group-id={group.id}
-                  onClick={() => toggleGroup(group.id)}
                   style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "6px 14px 4px",
-                    background: dragViz?.dropGroupId === group.id ? "var(--accent-subtle)" : "none",
-                    border: "none",
+                    position: "relative",
+                    background: draggingGroupId === group.id
+                      ? "var(--accent-subtle)"
+                      : dragViz?.dropGroupId === group.id
+                        ? "color-mix(in srgb, var(--accent) 12%, transparent)"
+                        : groupDropTarget === group.id
+                          ? "var(--bg-selected)"
+                          : "none",
                     borderRadius: 6,
-                    cursor: "pointer",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "var(--text-hint)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    textAlign: "left",
-                    transition: "background 0.15s ease, color 0.15s ease",
+                    transition: "background 0.15s ease",
                   }}
-                  onMouseEnter={(e) => {
-                    if (dragViz?.dropGroupId !== group.id) e.currentTarget.style.color = "var(--text-secondary)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (dragViz?.dropGroupId !== group.id) e.currentTarget.style.color = "var(--text-hint)";
-                  }}
-                  title={isCollapsed ? "展开分组" : "折叠分组"}
                 >
-                  <span style={{ fontSize: 8, transform: isCollapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s ease" }}>
-                    ▶
-                  </span>
-                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {group.name}
-                  </span>
-                  <span style={{ opacity: 0.6 }}>({groupProjects.length})</span>
-                </button>
+                  {/* 拖拽指示线（目标位置上方） */}
+                  {groupDropTarget === group.id && draggingGroupId !== group.id && (
+                    <div style={{ position: "absolute", top: 0, left: 8, right: 8, height: 2, background: "var(--accent, #4ade80)", zIndex: 1 }} />
+                  )}
+                  <button
+                    data-toggle="group"
+                    onPointerDown={(e) => handleGroupDragStart(e, group.id)}
+                    onClick={() => {
+                      // 如果是拖拽触发的点击，忽略
+                      if (draggingGroupId) return;
+                      toggleGroup(group.id);
+                    }}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "6px 14px 4px",
+                      background: "none",
+                      border: "none",
+                      cursor: draggingGroupId ? "grabbing" : "pointer",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: draggingGroupId === group.id ? "var(--text-primary)" : "var(--text-hint)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                      textAlign: "left",
+                      opacity: draggingGroupId === group.id ? 0.5 : 1,
+                      transition: "color 0.15s ease, opacity 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!draggingGroupId) e.currentTarget.style.color = "var(--text-secondary)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!draggingGroupId) e.currentTarget.style.color = "var(--text-hint)";
+                    }}
+                    title={isCollapsed ? "展开分组 (+拖动排序)" : "折叠分组 (+拖动排序)"}
+                  >
+                    <span style={{ fontSize: 8, transform: isCollapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s ease" }}>
+                      ▶
+                    </span>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {group.name}
+                    </span>
+                    <span style={{ opacity: 0.6 }}>({groupProjects.length})</span>
+                  </button>
+                </div>
               )}
               {/* 分组项目（折叠时隐藏） */}
               {!isCollapsed &&
