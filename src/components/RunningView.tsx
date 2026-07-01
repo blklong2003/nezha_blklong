@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   Download,
 } from "lucide-react";
+import { ProviderSelector } from "./new-task/ProviderSelector";
 
 interface SessionMetrics {
   duration_secs: number;
@@ -157,6 +158,7 @@ export function RunningView({
   const [worktreeBusy, setWorktreeBusy] = useState<"merge" | "discard" | null>(null);
   const [exporting, setExporting] = useState(false);
   const [bannerCompact, setBannerCompact] = useState(false);
+  const [providerId, setProviderId] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const interruptedBannerRef = useRef<HTMLDivElement>(null);
 
@@ -421,6 +423,11 @@ export function RunningView({
             </button>
           )}
         </div>
+        <ProviderSelector
+          agent={task.agent}
+          providerId={providerId}
+          onSetProviderId={setProviderId}
+        />
         {isActive && (
           <>
             <button style={s.doneBtn} onClick={onMarkDone}>
