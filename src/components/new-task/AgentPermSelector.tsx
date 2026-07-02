@@ -72,7 +72,6 @@ export function AgentPermSelector({
   planMode,
   isEmpty,
   hasImages,
-  saveAsTodoDisabledReason,
   sendShortcutKeys,
   onSetAgent,
   onSetPermMode,
@@ -85,7 +84,6 @@ export function AgentPermSelector({
   planMode: boolean;
   isEmpty: boolean;
   hasImages: boolean;
-  saveAsTodoDisabledReason?: string;
   sendShortcutKeys: string[];
   onSetAgent: (agent: AgentType) => void;
   onSetPermMode: (mode: PermissionMode) => void;
@@ -97,10 +95,6 @@ export function AgentPermSelector({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const sendShortcutLabel = sendShortcutKeys.join("");
   const sendLabel = isEmpty && !hasImages ? t("newTask.startTerminal") : t("newTask.send");
-  const saveAsTodoDisabled = hasImages || !!saveAsTodoDisabledReason;
-  const saveAsTodoTitle = hasImages
-    ? t("newTask.imagesMustSend")
-    : saveAsTodoDisabledReason;
 
   async function handleImageFiles(files: FileList | null) {
     const images = Array.from(files ?? []).filter((file) => file.type.startsWith("image/"));
@@ -268,6 +262,25 @@ export function AgentPermSelector({
 
       <div style={s.toolbarSpacer} />
 
+      {/* 暂存为待办 — 独立按钮，醒目可见 */}
+      <button
+        style={{
+          ...s.todoBtn,
+          opacity: isEmpty ? 0.4 : 1,
+          cursor: isEmpty ? "not-allowed" : "pointer",
+        }}
+        disabled={isEmpty}
+        title={isEmpty ? t("newTask.todoNeedContent") : t("newTask.saveAsTodo")}
+        onClick={() => {
+          if (isEmpty) return;
+          onSubmit(false);
+        }}
+      >
+        <BookmarkPlus size={14} strokeWidth={2} />
+        <span>{t("newTask.saveAsTodo")}</span>
+      </button>
+
+      {/* 发送 / 立即执行 */}
       <div style={s.sendSplit}>
         <button
           style={{
@@ -284,48 +297,6 @@ export function AgentPermSelector({
           <span>{sendLabel}</span>
           <SendShortcutIcon keys={sendShortcutKeys} />
         </button>
-        <Popover.Root>
-          <Popover.Trigger asChild>
-            <button
-              style={{
-                ...s.sendBtn,
-                minWidth: 22,
-                minHeight: 32,
-                padding: "6px 5px",
-                borderRadius: "0 6px 6px 0",
-                borderLeft: "none",
-              }}
-            >
-              <ChevronDown size={12} strokeWidth={2.5} />
-            </button>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content side="bottom" align="end" sideOffset={6} style={s.toolbarMenuContent}>
-              <Popover.Close asChild>
-                <button
-                  style={{
-                    ...s.toolbarMenuItem,
-                    gap: 8,
-                    width: "100%",
-                    border: "none",
-                    background: "transparent",
-                    cursor: saveAsTodoDisabled ? "not-allowed" : "pointer",
-                    opacity: saveAsTodoDisabled ? 0.4 : 1,
-                  }}
-                  disabled={saveAsTodoDisabled}
-                  title={saveAsTodoTitle}
-                  onClick={() => {
-                    if (saveAsTodoDisabled) return;
-                    if (!isEmpty) onSubmit(false);
-                  }}
-                >
-                  <BookmarkPlus size={13} strokeWidth={2} color="var(--text-muted)" />
-                  {t("newTask.saveAsTodo")}
-                </button>
-              </Popover.Close>
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
       </div>
     </div>
   );

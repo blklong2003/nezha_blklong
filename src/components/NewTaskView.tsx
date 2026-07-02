@@ -664,9 +664,6 @@ export function NewTaskView({
           planMode={planMode}
           isEmpty={isEmpty}
           hasImages={pastedImages.length > 0 || pastedTexts.length > 0}
-          saveAsTodoDisabledReason={
-            launchMode === "worktree" ? t("newTask.worktreeMustSend") : undefined
-          }
           sendShortcutKeys={getSendShortcutKeys(sendShortcut, APP_PLATFORM)}
           onSetAgent={setAgent}
           onSetPermMode={setPermMode}
