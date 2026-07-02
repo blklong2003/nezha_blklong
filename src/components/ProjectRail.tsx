@@ -159,13 +159,21 @@ export function ProjectRail({
 
   const groupDraggingRef = useRef<string | null>(null);
 
-  const handleGroupDragStart = useCallback((_e: React.PointerEvent, groupId: string) => {
+  // 分组拖拽的浮层位置 (preview X/Y)
+  const [groupDragPreview, setGroupDragPreview] = useState<{ x: number; y: number } | null>(null);
+
+  const handleGroupDragStart = useCallback((e: React.PointerEvent, groupId: string) => {
+    e.preventDefault();
     groupDraggingRef.current = groupId;
+    setDraggingGroupId(groupId);
+    setGroupDragPreview({ x: e.clientX, y: e.clientY });
 
     // 闭包变量，跨 handleMove / handleUp 同步记录最终 drop 目标
     let lastDropTarget: string | null = null;
 
     const handleMove = (moveEvent: PointerEvent) => {
+      setGroupDragPreview({ x: moveEvent.clientX, y: moveEvent.clientY });
+
       const container = railContainerRef.current;
       if (!container) return;
 
@@ -207,7 +215,8 @@ export function ProjectRail({
           if (dragIdx === -1 || dropIdx === -1) return prev;
 
           const [removed] = sorted.splice(dragIdx, 1);
-          sorted.splice(dropIdx, 0, removed);
+          const adjustedDropIdx = dropIdx > dragIdx ? dropIdx - 1 : dropIdx;
+          sorted.splice(adjustedDropIdx, 0, removed);
 
           const updated = sorted.map((g, i) => ({ ...g, order: i }));
           invoke("save_project_groups", { groups: updated }).catch(() => {});
@@ -218,6 +227,7 @@ export function ProjectRail({
       groupDraggingRef.current = null;
       setDraggingGroupId(null);
       setGroupDropTarget(null);
+      setGroupDragPreview(null);
     };
 
     document.addEventListener("pointermove", handleMove);
@@ -584,100 +594,119 @@ export function ProjectRail({
           return (
             <div key={group?.id ?? "__ungrouped__"}>
               {/* 分组头 */}
-              {group && (
-                <div
-                  data-group-id={group.id}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setGroupCtxMenu({ x: e.clientX, y: e.clientY, group });
-                  }}
-                  style={{
-                    position: "relative",
-                    background: draggingGroupId === group.id
-                      ? "var(--accent-subtle)"
-                      : dragViz?.dropGroupId === group.id
-                        ? "color-mix(in srgb, var(--accent) 12%, transparent)"
-                        : groupDropTarget === group.id
-                          ? "var(--bg-selected)"
-                          : "none",
-                    borderRadius: 6,
-                    transition: "background 0.15s ease",
-                  }}
-                  onMouseEnter={() => setHoveredGroup(group.id)}
-                  onMouseLeave={() => setHoveredGroup(null)}
-                >
-                  {/* 拖拽指示线（目标位置上方） */}
-                  {groupDropTarget === group.id && draggingGroupId !== group.id && (
-                    <div style={{ position: "absolute", top: 0, left: 8, right: 8, height: 2, background: "var(--accent, #4ade80)", zIndex: 1 }} />
-                  )}
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <button
-                      data-toggle="group"
-                      onPointerDown={(e) => handleGroupDragStart(e, group.id)}
-                      onClick={() => {
-                        if (draggingGroupId) return;
-                        toggleGroup(group.id);
-                      }}
-                      style={{
-                        flex: 1,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                        padding: "6px 14px 4px",
-                        background: "none",
-                        border: "none",
-                        cursor: draggingGroupId ? "grabbing" : "pointer",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: draggingGroupId === group.id ? "var(--text-primary)" : "var(--text-hint)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        textAlign: "left",
-                        opacity: draggingGroupId === group.id ? 0.5 : 1,
-                        transition: "color 0.15s ease, opacity 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!draggingGroupId) e.currentTarget.style.color = "var(--text-secondary)";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!draggingGroupId) e.currentTarget.style.color = "var(--text-hint)";
-                      }}
-                      title={isCollapsed ? "展开分组 (+拖动排序)" : "折叠分组 (+拖动排序)"}
-                    >
-                      <span style={{ fontSize: 10, transform: isCollapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s ease" }}>
-                        ▶
-                      </span>
-                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>
-                        {group.name}
-                      </span>
-                      <span style={{ opacity: 0.6, marginLeft: 4 }}>({groupProjects.length})</span>
-                    </button>
-                    {/* 分组操作按钮（悬停显示） */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setGroupCtxMenu({ x: e.clientX, y: e.clientY, group });
-                      }}
-                      style={{
-                        padding: "2px 6px",
-                        marginRight: 4,
-                        background: "none",
-                        border: "none",
-                        borderRadius: 4,
-                        cursor: "pointer",
-                        color: "var(--text-hint)",
-                        fontSize: 12,
-                        opacity: hoveredGroup === group.id ? 1 : 0,
-                        transition: "opacity 0.15s ease",
-                      }}
-                      title="分组操作"
-                    >
-                      ⋯
-                    </button>
+              {group && (() => {
+                const isBeingDragged = draggingGroupId === group.id;
+                // 让位动画：非拖拽分组根据 dropTarget 上移或下移
+                let groupTranslateY = 0;
+                if (draggingGroupId && !isBeingDragged && groupDropTarget) {
+                  const sortedGroups = [...groups].sort((a, b) => a.order - b.order);
+                  const dragIdx = sortedGroups.findIndex((g) => g.id === draggingGroupId);
+                  const thisIdx = sortedGroups.findIndex((g) => g.id === group.id);
+                  const targetIdx = sortedGroups.findIndex((g) => g.id === groupDropTarget);
+                  if (dragIdx !== -1 && thisIdx !== -1 && targetIdx !== -1) {
+                    // 如果拖拽项从上方拖到本项下方 → 本项上移
+                    // 如果拖拽项从下方拖到本项上方 → 本项下移
+                    if (dragIdx < thisIdx && thisIdx >= targetIdx) groupTranslateY = -1;
+                    else if (dragIdx > thisIdx && thisIdx <= targetIdx) groupTranslateY = 1;
+                  }
+                }
+                const groupBlockStyle: React.CSSProperties = {
+                  position: "relative",
+                  background: isBeingDragged
+                    ? "var(--accent-subtle)"
+                    : dragViz?.dropGroupId === group.id
+                      ? "color-mix(in srgb, var(--accent) 12%, transparent)"
+                      : groupDropTarget === group.id
+                        ? "var(--bg-selected)"
+                        : "none",
+                  borderRadius: 6,
+                  transition: "background 0.15s ease, transform 0.15s ease",
+                  transform: groupTranslateY !== 0 ? `translateY(${groupTranslateY * 30}px)` : undefined,
+                  opacity: isBeingDragged ? 0.4 : 1,
+                };
+                return (
+                  <div
+                    data-group-id={group.id}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setGroupCtxMenu({ x: e.clientX, y: e.clientY, group });
+                    }}
+                    style={groupBlockStyle}
+                    onMouseEnter={() => setHoveredGroup(group.id)}
+                    onMouseLeave={() => setHoveredGroup(null)}
+                  >
+                    {/* 拖拽指示线（目标位置上方） */}
+                    {groupDropTarget === group.id && draggingGroupId !== group.id && (
+                      <div style={{ position: "absolute", top: -3, left: 4, right: 4, height: 3, background: "var(--accent, #4ade80)", borderRadius: 2, zIndex: 2 }} />
+                    )}
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <button
+                        data-toggle="group"
+                        onPointerDown={(e) => handleGroupDragStart(e, group.id)}
+                        onClick={() => {
+                          if (draggingGroupId) return;
+                          toggleGroup(group.id);
+                        }}
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "6px 14px 4px",
+                          background: "none",
+                          border: "none",
+                          cursor: draggingGroupId ? "grabbing" : "pointer",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: isBeingDragged ? "var(--text-primary)" : "var(--text-hint)",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          textAlign: "left",
+                          transition: "color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!draggingGroupId) e.currentTarget.style.color = "var(--text-secondary)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!draggingGroupId) e.currentTarget.style.color = "var(--text-hint)";
+                        }}
+                        title={isCollapsed ? "展开分组 (+拖动排序)" : "折叠分组 (+拖动排序)"}
+                      >
+                        <span style={{ fontSize: 10, transform: isCollapsed ? "none" : "rotate(90deg)", transition: "transform 0.15s ease" }}>
+                          ▶
+                        </span>
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left" }}>
+                          {group.name}
+                        </span>
+                        <span style={{ opacity: 0.6, marginLeft: 4 }}>({groupProjects.length})</span>
+                      </button>
+                      {/* 分组操作按钮（悬停显示） */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setGroupCtxMenu({ x: e.clientX, y: e.clientY, group });
+                        }}
+                        style={{
+                          padding: "2px 6px",
+                          marginRight: 4,
+                          background: "none",
+                          border: "none",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          color: "var(--text-hint)",
+                          fontSize: 12,
+                          opacity: hoveredGroup === group.id ? 1 : 0,
+                          transition: "opacity 0.15s ease",
+                        }}
+                        title="分组操作"
+                      >
+                        ⋯
+                      </button>
+                    </div>
                   </div>
-                </div>
-             )}
+                );
+              })()}
               {/* 分组项目（折叠时隐藏） */}
               {!isCollapsed &&
                 groupProjects.map((project) => {
@@ -866,6 +895,38 @@ export function ProjectRail({
           </span>
         </div>
       )}
+
+      {/* 分组拖拽浮层 — 跟手指走 */}
+      {draggingGroupId && groupDragPreview && (() => {
+        const draggingGroup = groups.find((g) => g.id === draggingGroupId);
+        if (!draggingGroup) return null;
+        return (
+          <div
+            style={{
+              position: "fixed",
+              left: groupDragPreview.x - 90,
+              top: groupDragPreview.y - 16,
+              width: 180,
+              padding: "6px 12px",
+              borderRadius: 8,
+              background: "color-mix(in srgb, var(--bg-sidebar) 92%, white 8%)",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.18)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              pointerEvents: "none",
+              zIndex: 999,
+              transform: "scale(1.05)",
+              transition: "transform 0.1s ease",
+            }}
+          >
+            <span style={{ fontSize: 10, color: "var(--text-hint)" }}>▶</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", textTransform: "uppercase", letterSpacing: "0.5px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>
+              {draggingGroup.name}
+            </span>
+          </div>
+        );
+      })()}
 
       {/* 右键菜单 */}
       {ctxMenu && (
