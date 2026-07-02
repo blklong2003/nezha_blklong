@@ -1529,12 +1529,36 @@ pub async fn worktree_diff_stats(
 fn accumulate_numstat(stdout: &[u8], additions: &mut i32, deletions: &mut i32) {
     for line in String::from_utf8_lossy(stdout).lines() {
         let parts: Vec<&str> = line.splitn(3, '\t').collect();
-        if parts.len() != 3 {
+        if (parts.len() != 3) {
             continue;
         }
         *additions += parts[0].parse::<i32>().unwrap_or(0);
         *deletions += parts[1].parse::<i32>().unwrap_or(0);
     }
+}
+
+/// 获取 worktree 中变更的文件列表（porcelain status 格式）。
+#[tauri::command]
+pub async fn get_worktree_changed_files(
+    project_path: String,
+    worktree_path: String,
+) -> Result<String, String> {
+    validate_project_path(&project_path)?;
+    ensure_path_under_worktrees_root(&project_path, &worktree_path)?;
+
+    let output = run_git(
+        &worktree_path,
+        &["status", "--porcelain", "--untracked-files=all"],
+    )?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "git status failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 #[cfg(test)]

@@ -259,6 +259,7 @@ pub fn run() {
             git::merge_task_worktree,
             git::remove_task_worktree,
             git::worktree_diff_stats,
+            git::get_worktree_changed_files,
             analytics::read_session_metrics,
             session::resolve_session_path,
             session::read_session_messages,

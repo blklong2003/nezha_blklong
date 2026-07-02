@@ -19,6 +19,7 @@ import { writeClipboardText } from "./file-explorer/clipboard";
 import { getUsageColor } from "../utils";
 import { useUsageSnapshot } from "../hooks/useUsageSnapshot";
 import { useSessionPolling } from "../hooks/useSessionPolling";
+import { FileChangesPanel } from "./RunningView/FileChangesPanel";
 import { ENABLE_USAGE_INSIGHTS } from "../platform";
 import { useI18n } from "../i18n";
 import s from "../styles";
@@ -162,7 +163,7 @@ export function RunningView({
   const [worktreeBusy, setWorktreeBusy] = useState<"merge" | "discard" | null>(null);
   const [exporting, setExporting] = useState(false);
   const [bannerCompact, setBannerCompact] = useState(false);
-  const [activeTab, setActiveTab] = useState<"conversation" | "terminal">("conversation");
+  const [activeTab, setActiveTab] = useState<"conversation" | "terminal" | "files">("conversation");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const interruptedBannerRef = useRef<HTMLDivElement>(null);
 
@@ -734,6 +735,24 @@ export function RunningView({
             >
               🖥️ 终端
             </button>
+            {task.worktreePath && (
+              <button
+                onClick={() => setActiveTab("files")}
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 12,
+                  fontWeight: activeTab === "files" ? 600 : 400,
+                  color: activeTab === "files" ? "var(--text-primary)" : "var(--text-hint)",
+                  background: "none",
+                  border: "none",
+                  borderBottom: activeTab === "files" ? "2px solid var(--accent)" : "2px solid transparent",
+                  cursor: "pointer",
+                  transition: "color 0.15s, border-color 0.15s",
+                }}
+              >
+                📁 文件
+              </button>
+            )}
           </div>
           {/* 内容区 */}
           {activeTab === "conversation" ? (
@@ -765,6 +784,8 @@ export function RunningView({
                 </>
               )}
             </div>
+          ) : activeTab === "files" ? (
+            <FileChangesPanel worktreePath={task.worktreePath} projectPath={projectPath} />
           ) : (
             <div style={s.terminalContainer}>
               <TerminalView

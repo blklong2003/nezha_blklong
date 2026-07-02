@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import katex from "katex";
 import { Copy, Check } from "lucide-react";
 import type { SessionMessage, SessionContent } from "./types";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolUseCard } from "./ToolUseCard";
 import { UserMessageBubble } from "./UserMessageBubble";
 import { useI18n } from "../../i18n";
-import "katex/dist/katex.min.css";
 
 /** 相对时间格式化（毫秒）- 用于消息时间戳。 */
 function formatMessageTime(ts: number, t: (key: string, params?: Record<string, string | number>) => string): string {
@@ -20,31 +18,9 @@ function formatMessageTime(ts: number, t: (key: string, params?: Record<string, 
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
-/** 渲染 LaTeX 公式（在 marked 之前处理，避免被 Markdown 语法干扰）。 */
-function renderMath(text: string): string {
-  // 块级公式 $$ ... $$
-  text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
-    try {
-      return `<div class="math-block">${katex.renderToString(math.trim(), { displayMode: true, throwOnError: false })}</div>`;
-    } catch {
-      return `<pre class="math-error">$$${math}$$</pre>`;
-    }
-  });
-  // 行内公式 $ ... $（排除 $$ 情况）
-  text = text.replace(/(?<!\$)\$([^\$\n]{1,200}?)\$(?!\$)/g, (_, math) => {
-    try {
-      return katex.renderToString(math.trim(), { displayMode: false, throwOnError: false });
-    } catch {
-      return `<code class="math-error">$${math}$</code>`;
-    }
-  });
-  return text;
-}
-
 /** Markdown → 清洗后的安全 HTML。内容经远程面板对外提供，必须 sanitize 防 XSS。 */
 function renderMarkdown(text: string): string {
-  const withMath = renderMath(text);
-  const html = marked(withMath, { async: false }) as string;
+  const html = marked(text, { async: false }) as string;
   return DOMPurify.sanitize(html);
 }
 
