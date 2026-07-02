@@ -13,10 +13,12 @@ import { permissionModeLabel } from "../types";
 import { StatusIcon } from "./StatusIcon";
 import { TerminalView } from "./TerminalView";
 import { SessionView } from "./SessionView";
+import { MessageList } from "./session-view/MessageList";
 import { useToast } from "./Toast";
 import { writeClipboardText } from "./file-explorer/clipboard";
 import { getUsageColor } from "../utils";
 import { useUsageSnapshot } from "../hooks/useUsageSnapshot";
+import { useSessionPolling } from "../hooks/useSessionPolling";
 import { ENABLE_USAGE_INSIGHTS } from "../platform";
 import { useI18n } from "../i18n";
 import s from "../styles";
@@ -160,8 +162,15 @@ export function RunningView({
   const [worktreeBusy, setWorktreeBusy] = useState<"merge" | "discard" | null>(null);
   const [exporting, setExporting] = useState(false);
   const [bannerCompact, setBannerCompact] = useState(false);
+  const [activeTab, setActiveTab] = useState<"conversation" | "terminal">("conversation");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const interruptedBannerRef = useRef<HTMLDivElement>(null);
+
+  // 实时轮询 JSONL 会话文件
+  const { messages: liveMessages, loading: liveLoading } = useSessionPolling(
+    sessionPath || null,
+    2000
+  );
 
   const generateTooltip = generatingName
     ? t("task.generatingName")
@@ -682,22 +691,99 @@ export function RunningView({
           )}
         </div>
       ) : isActive || !sessionPath ? (
-        <div style={s.terminalContainer}>
-          <TerminalView
-            key={`${task.id}-${runCount}`}
-            onInput={onInput}
-            onResize={onResize}
-            onRegisterTerminal={onRegisterTerminal}
-            onReady={onTerminalReady}
-            onSnapshot={onSnapshot}
-            themeVariant={themeVariant}
-            terminalFontSize={terminalFontSize}
-            terminalScrollback={terminalScrollback}
-            monoFontFamily={monoFontFamily}
-            isActive={visible}
-            initialData={restoreState.initialData}
-            initialSnapshot={restoreState.initialSnapshot}
-          />
+        /* 执行中：Tab 切换 对话 / 终端 */
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {/* Tab 栏 */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            padding: "6px 12px 0",
+            borderBottom: "1px solid var(--border-dim)",
+            flexShrink: 0,
+          }}>
+            <button
+              onClick={() => setActiveTab("conversation")}
+              style={{
+                padding: "4px 10px",
+                fontSize: 12,
+                fontWeight: activeTab === "conversation" ? 600 : 400,
+                color: activeTab === "conversation" ? "var(--text-primary)" : "var(--text-hint)",
+                background: "none",
+                border: "none",
+                borderBottom: activeTab === "conversation" ? "2px solid var(--accent)" : "2px solid transparent",
+                cursor: "pointer",
+                transition: "color 0.15s, border-color 0.15s",
+              }}
+            >
+              💬 对话
+            </button>
+            <button
+              onClick={() => setActiveTab("terminal")}
+              style={{
+                padding: "4px 10px",
+                fontSize: 12,
+                fontWeight: activeTab === "terminal" ? 600 : 400,
+                color: activeTab === "terminal" ? "var(--text-primary)" : "var(--text-hint)",
+                background: "none",
+                border: "none",
+                borderBottom: activeTab === "terminal" ? "2px solid var(--accent)" : "2px solid transparent",
+                cursor: "pointer",
+                transition: "color 0.15s, border-color 0.15s",
+              }}
+            >
+              🖥️ 终端
+            </button>
+          </div>
+          {/* 内容区 */}
+          {activeTab === "conversation" ? (
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+              {liveLoading && liveMessages.length === 0 ? (
+                <div style={{ color: "var(--text-hint)", fontSize: 13 }}>{t("session.loading")}</div>
+              ) : liveMessages.length === 0 ? (
+                <div style={{ color: "var(--text-hint)", fontSize: 13 }}>{t("session.noMessages")}</div>
+              ) : (
+                <>
+                  <MessageList messages={liveMessages} />
+                  {isActive && (
+                    <div style={{
+                      fontSize: 12,
+                      color: "var(--text-hint)",
+                      marginTop: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}>
+                      <span style={{ display: "inline-flex", gap: 3 }}>
+                        <span style={{ animation: "notif-pulse 1.2s ease-in-out infinite" }}>●</span>
+                        <span style={{ animation: "notif-pulse 1.2s ease-in-out infinite 0.4s" }}>●</span>
+                        <span style={{ animation: "notif-pulse 1.2s ease-in-out infinite 0.8s" }}>●</span>
+                      </span>
+                      <span>{t("session.thinking")}</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <div style={s.terminalContainer}>
+              <TerminalView
+                key={`${task.id}-${runCount}`}
+                onInput={onInput}
+                onResize={onResize}
+                onRegisterTerminal={onRegisterTerminal}
+                onReady={onTerminalReady}
+                onSnapshot={onSnapshot}
+                themeVariant={themeVariant}
+                terminalFontSize={terminalFontSize}
+                terminalScrollback={terminalScrollback}
+                monoFontFamily={monoFontFamily}
+                isActive={visible}
+                initialData={restoreState.initialData}
+                initialSnapshot={restoreState.initialSnapshot}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <SessionView sessionPath={sessionPath} />

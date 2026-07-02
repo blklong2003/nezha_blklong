@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
+import katex from "katex";
 import { Copy, Check } from "lucide-react";
-import type { SessionMessage } from "./types";
+import type { SessionMessage, SessionContent } from "./types";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolUseCard } from "./ToolUseCard";
 import { UserMessageBubble } from "./UserMessageBubble";
 import { useI18n } from "../../i18n";
+import "katex/dist/katex.min.css";
 
 /** 相对时间格式化（毫秒）- 用于消息时间戳。 */
 function formatMessageTime(ts: number, t: (key: string, params?: Record<string, string | number>) => string): string {
@@ -18,10 +20,64 @@ function formatMessageTime(ts: number, t: (key: string, params?: Record<string, 
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
+/** 渲染 LaTeX 公式（在 marked 之前处理，避免被 Markdown 语法干扰）。 */
+function renderMath(text: string): string {
+  // 块级公式 $$ ... $$
+  text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
+    try {
+      return `<div class="math-block">${katex.renderToString(math.trim(), { displayMode: true, throwOnError: false })}</div>`;
+    } catch {
+      return `<pre class="math-error">$$${math}$$</pre>`;
+    }
+  });
+  // 行内公式 $ ... $（排除 $$ 情况）
+  text = text.replace(/(?<!\$)\$([^\$\n]{1,200}?)\$(?!\$)/g, (_, math) => {
+    try {
+      return katex.renderToString(math.trim(), { displayMode: false, throwOnError: false });
+    } catch {
+      return `<code class="math-error">$${math}$</code>`;
+    }
+  });
+  return text;
+}
+
 /** Markdown → 清洗后的安全 HTML。内容经远程面板对外提供，必须 sanitize 防 XSS。 */
 function renderMarkdown(text: string): string {
-  const html = marked(text, { async: false }) as string;
+  const withMath = renderMath(text);
+  const html = marked(withMath, { async: false }) as string;
   return DOMPurify.sanitize(html);
+}
+
+/** 渲染单个 content block（支持多模态）。 */
+function renderContentBlock(content: SessionContent, index: number): React.ReactNode {
+  switch (content.type) {
+    case "image":
+      if (content.source?.type === "base64") {
+        return (
+          <img
+            key={index}
+            src={`data:${content.source.media_type};base64,${content.source.data}`}
+            style={{
+              maxWidth: "100%",
+              borderRadius: 8,
+              marginTop: 8,
+              marginBottom: 8,
+              display: "block",
+            }}
+          />
+        );
+      }
+      return null;
+    case "tool_result":
+      if (!content.content?.length) return null;
+      return (
+        <div key={index} style={{ marginTop: 4, marginBottom: 4 }}>
+          {content.content.map((c, i) => renderContentBlock(c, i))}
+        </div>
+      );
+    default:
+      return null;
+  }
 }
 
 /** 渲染单条会话消息（用户气泡，或 assistant 的 thinking/text/tool 组合）。纯渲染。 */
@@ -41,20 +97,24 @@ export function MessageBlock({ message }: { message: SessionMessage }) {
   const textParts = message.content.filter((c) => c.type === "text");
   const toolParts = message.content.filter((c) => c.type === "tool_use");
   const thinkingParts = message.content.filter((c) => c.type === "thinking");
+  const imageParts = message.content.filter((c) => c.type === "image");
+  const toolResultParts = message.content.filter((c) => c.type === "tool_result");
 
-  if (textParts.length === 0 && toolParts.length === 0 && thinkingParts.length === 0) return null;
+  if (textParts.length === 0 && toolParts.length === 0 && thinkingParts.length === 0 && imageParts.length === 0 && toolResultParts.length === 0) return null;
 
   return (
     <div style={{ marginBottom: 18, position: "relative" }}>
       {thinkingParts.map((t, i) => (
-        <ThinkingBlock key={i} thinking={t.thinking ?? ""} />
+        <ThinkingBlock key={`th-${i}`} thinking={t.thinking ?? ""} />
       ))}
       {textParts.map((t, i) => (
-        <AssistantTextBlock key={i} html={renderMarkdown(t.text ?? "")} />
+        <AssistantTextBlock key={`tx-${i}`} html={renderMarkdown(t.text ?? "")} />
       ))}
       {toolParts.map((t, i) => (
-        <ToolUseCard key={i} name={t.name ?? ""} input={t.input ?? ""} />
+        <ToolUseCard key={`tu-${i}`} name={t.name ?? ""} input={t.input ?? ""} />
       ))}
+      {imageParts.map((img, i) => renderContentBlock(img, i))}
+      {toolResultParts.map((tr, i) => renderContentBlock(tr, i))}
       {message.created_at && (
         <div
           style={{
