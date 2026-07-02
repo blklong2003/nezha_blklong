@@ -663,6 +663,12 @@ pub async fn run_task(
             for (key, value) in provider_env {
                 cmd.env(key, value);
             }
+        } else {
+            // provider 不存在或无 env 配置：记录警告但不阻塞任务启动
+            eprintln!(
+                "[run_task] provider '{}' not found or has no env config for agent '{}', starting without provider env",
+                pid, agent
+            );
         }
     }
 

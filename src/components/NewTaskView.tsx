@@ -681,13 +681,11 @@ export function NewTaskView({
           onSubmit={handleSubmit}
         />
         {/* cc-switch provider selector */}
-        <div style={{ padding: "0 14px 8px" }}>
-          <ProviderSelector
-            agent={agent}
-            providerId={providerId}
-            onSetProviderId={setProviderId}
-          />
-        </div>
+        <ProviderSelector
+          agent={agent}
+          providerId={providerId}
+          onSetProviderId={setProviderId}
+        />
       </div>
 
       {/* Launch mode + base branch (compose card 外、独立一栏) */}
