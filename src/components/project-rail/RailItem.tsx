@@ -5,6 +5,7 @@ import { ProjectAvatar } from "../ProjectAvatar";
 import s from "../../styles";
 import claudeWaveGif from "../../assets/gif/claude-wave.gif";
 import type { ProjectStatus } from "./activity";
+import { NotificationRow } from "./NotificationRow";
 
 // 项目状态指示:启用角标且存在待确认任务时显示数量角标,否则回退为小圆点。
 // borderColor 用于与所在容器背景描边融合(rail 与 drawer 背景不同)。
@@ -49,6 +50,9 @@ export const RailItem = memo(function RailItem({
   onPointerDown,
   onClick,
   onContextMenu,
+  notifications,
+  onNotificationAction,
+  onNotificationDismiss,
 }: {
   project: Project;
   isActive: boolean;
@@ -61,6 +65,9 @@ export const RailItem = memo(function RailItem({
   onPointerDown: (project: Project, event: React.PointerEvent<HTMLButtonElement>) => void;
   onClick: (project: Project) => void;
   onContextMenu?: (e: React.MouseEvent, project: Project) => void;
+  notifications?: import("../../types").TaskNotification[];
+  onNotificationAction?: (projectId: string, taskId: string, action: import("../../types").TaskNotificationAction) => void;
+  onNotificationDismiss?: (notificationId: string) => void;
 }) {
   const [hov, setHov] = useState(false);
   const [waving, setWaving] = useState(false);
@@ -79,6 +86,7 @@ export const RailItem = memo(function RailItem({
   const transition = "transform 160ms cubic-bezier(0.22, 1, 0.36, 1), opacity 100ms, background 100ms";
 
   return (
+    <div>
     <button
       data-rail-id={project.id}
       onClick={() => onClick(project)}
@@ -185,5 +193,33 @@ export const RailItem = memo(function RailItem({
         </span>
       )}
     </button>
+
+    {/* Inline task notifications */}
+    {notifications && notifications.length > 0 && (
+      <div style={{ paddingBottom: 2 }}>
+        {notifications.slice(0, 3).map((notif) => (
+          <NotificationRow
+            key={notif.id}
+            notification={notif}
+            onAction={(action) =>
+              onNotificationAction?.(project.id, notif.taskId, action)
+            }
+            onDismiss={() => onNotificationDismiss?.(notif.id)}
+          />
+        ))}
+        {notifications.length > 3 && (
+          <div
+            style={{
+              padding: "2px 8px 2px 36px",
+              fontSize: 10.5,
+              color: "var(--text-hint)",
+            }}
+          >
+            +{notifications.length - 3} 条更多
+          </div>
+        )}
+      </div>
+      )}
+    </div>
   );
 });

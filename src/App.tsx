@@ -15,6 +15,8 @@ import type {
   TerminalScrollback,
   TaskDisplayWindow,
   SkillHubConfig,
+  TaskNotification,
+  TaskNotificationAction,
 } from "./types";
 import {
   isActiveTaskStatus,
@@ -153,6 +155,7 @@ interface ProjectViewState {
   isNewTask: boolean;
   taskPanelCollapsed: boolean;
   hideBranchBar: boolean;
+  initialRightPanel?: "files" | "git-changes" | "git-history";
 }
 
 function createDefaultProjectViewState(): ProjectViewState {
@@ -305,6 +308,73 @@ function App() {
   const [taskRunCounts, setTaskRunCounts] = useState<Record<string, number>>({});
   const [skillHubConfig, setSkillHubConfig] = useState<SkillHubConfig | null>(null);
   const [hubMode, setHubMode] = useState(false);
+
+  // ── Task notifications (inline sidebar) ─────────────────────────────────────
+  const [notifications, setNotifications] = useState<TaskNotification[]>([]);
+
+  const addNotification = useCallback((notif: TaskNotification) => {
+    setNotifications((prev) => {
+      // 同 taskId 的旧通知被新通知替换（如 running → done 不重复显示）
+      const filtered = prev.filter((n) => n.taskId !== notif.taskId);
+      return [...filtered, notif];
+    });
+  }, []);
+
+  const dismissNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  // 根据任务状态 + 失败原因构建通知
+  const buildTaskNotification = useCallback(
+    (task: Task, status: TaskStatus, failureReason?: string): TaskNotification | null => {
+      const base = {
+        id: `${task.id}-${Date.now()}`,
+        projectId: task.projectId,
+        taskId: task.id,
+        subject: task.name ?? task.prompt.slice(0, 40),
+        createdAt: Date.now(),
+        failureReason,
+      };
+
+      switch (status) {
+        case "done":
+          return {
+            ...base,
+            type: "task_done",
+            title: "已完成",
+            level: "info",
+            actions: task.worktreePath ? ["view_diff", "view_session"] : ["view_session"],
+          };
+        case "failed":
+          return {
+            ...base,
+            type: "task_failed",
+            title: "任务失败",
+            level: "info",
+            actions: ["resume", "retry"],
+          };
+        case "input_required":
+          return {
+            ...base,
+            type: "task_input_required",
+            title: "需要输入",
+            level: "needs_attention",
+            actions: ["navigate"],
+          };
+        case "cancelled":
+          return {
+            ...base,
+            type: "task_cancelled",
+            title: "已取消",
+            level: "info",
+            actions: [],
+          };
+        default:
+          return null;
+      }
+    },
+    [],
+  );
 
   const tm = useTerminalManager();
   const pendingResumeStartsRef = useRef<Record<string, () => void>>({});
@@ -604,6 +674,14 @@ function App() {
           tm.removeTaskBuffers([task_id]);
         }
         if (status === "done") scheduleForDoneTask(task_id);
+
+        // ── 生成任务通知 ──
+        const task = tasks.find((t) => t.id === task_id);
+        if (task) {
+          const notif = buildTaskNotification(task, status, failure_reason);
+          if (notif) addNotification(notif);
+        }
+        // ──────────────────
       },
     );
     const p2 = listen<{ task_id: string; session_id: string; session_path: string }>(
@@ -618,7 +696,7 @@ function App() {
       p2.then((fn) => fn());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tasks, addNotification, buildTaskNotification]);
 
   async function handleOpen() {
     const selected = await openDialog({ directory: true, multiple: false });
@@ -713,6 +791,64 @@ function App() {
     setActiveProject(null);
     setHubMode(false);
   }
+
+  // ── Notification actions ──────────────────────────────────────────────────
+  const handleNotificationAction = useCallback(
+    (projectId: string, taskId: string, action: TaskNotificationAction) => {
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task) return;
+      const project = projects.find((p) => p.id === projectId);
+      if (!project) return;
+
+      const notifId = `${taskId}-${task.updatedAt}`;
+
+      switch (action) {
+        case "view_diff":
+          setActiveProject(project);
+          updateProjectView(projectId, {
+            selectedTaskId: taskId,
+            isNewTask: false,
+            initialRightPanel: "git-changes",
+          });
+          // 延迟清除 initialRightPanel，确保 ProjectPage 已消费
+          setTimeout(() => {
+            updateProjectView(projectId, { initialRightPanel: undefined });
+          }, 100);
+          dismissNotification(notifId);
+          break;
+        case "view_session":
+          setActiveProject(project);
+          updateProjectView(projectId, { selectedTaskId: taskId, isNewTask: false });
+          dismissNotification(notifId);
+          break;
+        case "resume":
+          handleResumeTask(taskId);
+          break;
+        case "retry":
+          handleResumeTask(taskId);
+          break;
+        case "navigate":
+          setActiveProject(project);
+          updateProjectView(projectId, { selectedTaskId: taskId, isNewTask: false });
+          break;
+      }
+    },
+    [tasks, projects],
+  );
+
+  // ── Auto-dismiss info notifications after 30s ─────────────────────────────
+  useEffect(() => {
+    if (notifications.length === 0) return;
+    const timer = setTimeout(() => {
+      setNotifications((prev) =>
+        prev.filter((n) => {
+          if (n.level === "needs_attention") return true;
+          return Date.now() - n.createdAt < 30_000;
+        }),
+      );
+    }, 30_000);
+    return () => clearTimeout(timer);
+  }, [notifications]);
 
   function invokeRunTask(task: Task, projectPath: string, images: string[], texts: string[] = []) {
     invoke("run_task", {
@@ -1539,11 +1675,15 @@ function App() {
               onOpen={handleOpen}
               saveNewTaskDraft={saveNewTaskDraft}
               getNewTaskDraft={getNewTaskDraft}
+              notifications={notifications}
+              onNotificationAction={handleNotificationAction}
+              onNotificationDismiss={dismissNotification}
               taskPanelCollapsed={getProjectView(project.id).taskPanelCollapsed}
               onTaskPanelCollapsedChange={(collapsed) =>
                 updateProjectView(project.id, { taskPanelCollapsed: collapsed })
               }
               branchBarHidden={getProjectView(project.id).hideBranchBar}
+              initialRightPanel={getProjectView(project.id).initialRightPanel}
               themeVariant={themeVariant}
               themeMode={themeMode}
               systemPrefersDark={systemPrefersDark}

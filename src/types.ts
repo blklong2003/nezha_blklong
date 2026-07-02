@@ -280,6 +280,36 @@ export interface SkillInstallResult {
   installation?: SkillInstallation;
 }
 
+// ── Task Notifications (inline, sidebar) ─────────────────────────────────────
+
+export type TaskNotificationType =
+  | "task_done"
+  | "task_failed"
+  | "task_input_required"
+  | "task_cancelled"
+  | "worktree_merged"
+  | "worktree_failed";
+
+export type TaskNotificationAction =
+  | "view_diff"
+  | "view_session"
+  | "resume"
+  | "navigate"
+  | "retry";
+
+export interface TaskNotification {
+  id: string;
+  projectId: string;
+  taskId: string;
+  type: TaskNotificationType;
+  title: string;
+  subject: string;
+  createdAt: number;
+  level: "needs_attention" | "info";
+  actions: TaskNotificationAction[];
+  failureReason?: string;
+}
+
 export interface SkillDeleteResult {
   ok: boolean;
   removedLinks: number;

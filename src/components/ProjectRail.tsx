@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Project, Task, ProjectGroup } from "../types";
+import type { Project, Task, ProjectGroup, TaskNotification, TaskNotificationAction } from "../types";
 import { ProjectAvatar } from "./ProjectAvatar";
 import {
   railDragPreviewAvatarWrap,
@@ -34,6 +34,9 @@ export function ProjectRail({
   onMoveToGroup,
   onMoveToHidden,
   onOpen,
+  notifications,
+  onNotificationAction,
+  onNotificationDismiss,
   singleProjectMode = false,
 }: {
   projects: Project[];
@@ -49,6 +52,9 @@ export function ProjectRail({
   onMoveToGroup: (projectId: string, groupId: string | null) => void;
   onMoveToHidden: (projectId: string) => void;
   onOpen: () => void;
+  notifications?: TaskNotification[];
+  onNotificationAction?: (projectId: string, taskId: string, action: TaskNotificationAction) => void;
+  onNotificationDismiss?: (notificationId: string) => void;
   singleProjectMode?: boolean;
 }) {
   // 项目分组状态
@@ -278,6 +284,18 @@ export function ProjectRail({
     [projects],
   );
   const projectActivityById = useMemo(() => buildProjectActivityMap(allTasks), [allTasks]);
+
+  // 按 projectId 分组通知
+  const notificationsByProject = useMemo(() => {
+    if (!notifications) return new Map<string, TaskNotification[]>();
+    const map = new Map<string, TaskNotification[]>();
+    for (const n of notifications) {
+      const arr = map.get(n.projectId) ?? [];
+      arr.push(n);
+      map.set(n.projectId, arr);
+    }
+    return map;
+  }, [notifications]);
 
   // 拖拽相关:dragOrigin 一旦设置就开始监听 document 事件;dragViz 高频更新 dropIndex / preview
   // 位置驱动让位动画与浮层。pointerup 时只 commit 一次,projects state 不在拖动过程中变化。
@@ -750,6 +768,9 @@ export function ProjectRail({
                       onPointerDown={handleRailItemPointerDown}
                       onClick={handleRailItemClick}
                       onContextMenu={handleProjectContextMenu}
+                      notifications={notificationsByProject.get(project.id) ?? []}
+                      onNotificationAction={onNotificationAction}
+                      onNotificationDismiss={onNotificationDismiss}
                     />
                   );
                 })}

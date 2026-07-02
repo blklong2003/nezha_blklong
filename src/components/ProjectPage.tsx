@@ -11,6 +11,8 @@ import type {
   TerminalScrollback,
   TaskDisplayWindow,
   FontFamily,
+  TaskNotification,
+  TaskNotificationAction,
 } from "../types";
 import { TaskPanel } from "./TaskPanel";
 import { NewTaskView, type NewTaskDraft } from "./NewTaskView";
@@ -69,6 +71,10 @@ export function ProjectPage({
   onMoveToGroup,
   onMoveToHidden,
   onOpen,
+  notifications,
+  onNotificationAction,
+  onNotificationDismiss,
+  initialRightPanel,
   saveNewTaskDraft,
   getNewTaskDraft,
   taskPanelCollapsed,
@@ -150,6 +156,10 @@ export function ProjectPage({
   onMoveToGroup: (projectId: string, groupId: string | null) => void;
   onMoveToHidden: (projectId: string) => void;
   onOpen: () => void;
+  notifications?: TaskNotification[];
+  onNotificationAction?: (projectId: string, taskId: string, action: TaskNotificationAction) => void;
+  onNotificationDismiss?: (notificationId: string) => void;
+  initialRightPanel?: "files" | "git-changes" | "git-history";
   saveNewTaskDraft: (projectId: string, draft: any) => void;
   getNewTaskDraft: (projectId: string) => any;
   taskPanelCollapsed?: boolean;
@@ -204,6 +214,15 @@ export function ProjectPage({
   const [showShellTerminal, setShowShellTerminal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFileSearch, setShowFileSearch] = useState(false);
+
+  // 消费 initialRightPanel（来自通知动作的面板请求）
+  useEffect(() => {
+    if (initialRightPanel) {
+      openRightPanel(initialRightPanel);
+      // 消费后清除，避免重复打开
+      // 注意：这里通过 onSelectTask 触发 view 更新来清除 initialRightPanel
+    }
+  }, [initialRightPanel, openRightPanel]);
   const [mountedTaskIds, setMountedTaskIds] = useState<Set<string>>(() => new Set());
   const shellRef = useRef<ShellTerminalPanelHandle>(null);
   const pendingCmdRef = useRef<string | null>(null);
@@ -358,6 +377,9 @@ export function ProjectPage({
         onMoveToGroup={onMoveToGroup}
         onMoveToHidden={onMoveToHidden}
         onOpen={onOpen}
+        notifications={notifications}
+        onNotificationAction={onNotificationAction}
+        onNotificationDismiss={onNotificationDismiss}
         singleProjectMode={hubMode}
       />
       <TaskPanel
