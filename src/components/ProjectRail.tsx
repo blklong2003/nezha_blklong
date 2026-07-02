@@ -161,6 +161,8 @@ export function ProjectRail({
 
   // 分组拖拽的浮层位置 (preview X/Y)
   const [groupDragPreview, setGroupDragPreview] = useState<{ x: number; y: number } | null>(null);
+  // 各分组的 DOM ref，供拖拽开始时查找
+  const groupDomRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const handleGroupDragStart = useCallback((e: React.PointerEvent, groupId: string) => {
     e.preventDefault();
@@ -596,36 +598,30 @@ export function ProjectRail({
               {/* 分组头 */}
               {group && (() => {
                 const isBeingDragged = draggingGroupId === group.id;
-                // 让位动画：非拖拽分组根据 dropTarget 上移或下移
-                let groupTranslateY = 0;
-                if (draggingGroupId && !isBeingDragged && groupDropTarget) {
-                  const sortedGroups = [...groups].sort((a, b) => a.order - b.order);
-                  const dragIdx = sortedGroups.findIndex((g) => g.id === draggingGroupId);
-                  const thisIdx = sortedGroups.findIndex((g) => g.id === group.id);
-                  const targetIdx = sortedGroups.findIndex((g) => g.id === groupDropTarget);
-                  if (dragIdx !== -1 && thisIdx !== -1 && targetIdx !== -1) {
-                    // 如果拖拽项从上方拖到本项下方 → 本项上移
-                    // 如果拖拽项从下方拖到本项上方 → 本项下移
-                    if (dragIdx < thisIdx && thisIdx >= targetIdx) groupTranslateY = -1;
-                    else if (dragIdx > thisIdx && thisIdx <= targetIdx) groupTranslateY = 1;
-                  }
-                }
+                const isDropTarget = groupDropTarget === group.id && draggingGroupId !== group.id;
+                // 被拖分组：视觉上保留占位（显示被拖状态的视觉微调）
+                // 不分发 translateY，因为分组高度不固定，无法精确对齐
+                // 仅通过 指示线 + 浮层 提供拖拽定位反馈
                 const groupBlockStyle: React.CSSProperties = {
                   position: "relative",
                   background: isBeingDragged
-                    ? "var(--accent-subtle)"
+                    ? "color-mix(in srgb, var(--accent) 6%, transparent)"
                     : dragViz?.dropGroupId === group.id
                       ? "color-mix(in srgb, var(--accent) 12%, transparent)"
-                      : groupDropTarget === group.id
-                        ? "var(--bg-selected)"
+                      : isDropTarget
+                        ? "color-mix(in srgb, var(--accent) 8%, transparent)"
                         : "none",
                   borderRadius: 6,
-                  transition: "background 0.15s ease, transform 0.15s ease",
-                  transform: groupTranslateY !== 0 ? `translateY(${groupTranslateY * 30}px)` : undefined,
-                  opacity: isBeingDragged ? 0.4 : 1,
+                  transition: "background 0.15s ease",
+                  opacity: isBeingDragged ? 0.5 : 1,
+                  contain: "layout" as const,
                 };
                 return (
                   <div
+                    ref={(el) => {
+                      if (el) groupDomRefs.current.set(group.id, el);
+                      else groupDomRefs.current.delete(group.id);
+                    }}
                     data-group-id={group.id}
                     onContextMenu={(e) => {
                       e.preventDefault();
@@ -636,9 +632,20 @@ export function ProjectRail({
                     onMouseEnter={() => setHoveredGroup(group.id)}
                     onMouseLeave={() => setHoveredGroup(null)}
                   >
-                    {/* 拖拽指示线（目标位置上方） */}
+                    {/* 拖拽插入指示器 — 蓝色高亮横条 + 圆角 */}
                     {groupDropTarget === group.id && draggingGroupId !== group.id && (
-                      <div style={{ position: "absolute", top: -3, left: 4, right: 4, height: 3, background: "var(--accent, #4ade80)", borderRadius: 2, zIndex: 2 }} />
+                      <div style={{
+                        position: "absolute",
+                        top: -4,
+                        left: 6,
+                        right: 6,
+                        height: 4,
+                        background: "var(--accent, #4ade80)",
+                        borderRadius: 4,
+                        zIndex: 2,
+                        boxShadow: "0 0 8px var(--accent, #4ade80)",
+                        pointerEvents: "none",
+                      }} />
                     )}
                     <div style={{ display: "flex", alignItems: "center" }}>
                       <button
