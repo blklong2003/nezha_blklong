@@ -8,6 +8,16 @@ import { ToolUseCard } from "./ToolUseCard";
 import { UserMessageBubble } from "./UserMessageBubble";
 import { useI18n } from "../../i18n";
 
+// KaTeX 动态导入（避免 rolldown 静态打包问题）
+let katexReady = false;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let katexModule: any = null;
+import("katex").then((mod: any) => {
+  katexModule = mod.default || mod;
+  katexReady = true;
+}).catch(() => {});
+import "katex/dist/katex.min.css";
+
 /** 相对时间格式化（毫秒）- 用于消息时间戳。 */
 function formatMessageTime(ts: number, t: (key: string, params?: Record<string, string | number>) => string): string {
   const diff = Date.now() - ts;
@@ -18,9 +28,33 @@ function formatMessageTime(ts: number, t: (key: string, params?: Record<string, 
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
+/** 渲染 LaTeX 公式（动态使用 KaTeX，未加载时回退到原文）。 */
+function renderMath(text: string): string {
+  if (!katexReady || !katexModule) return text;
+  const katex = katexModule;
+  // 块级公式 $$ ... $$
+  text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
+    try {
+      return `<div class="math-block">${katex.renderToString(math.trim(), { displayMode: true, throwOnError: false })}</div>`;
+    } catch {
+      return `<pre class="math-error">$$${math}$$</pre>`;
+    }
+  });
+  // 行内公式 $ ... $
+  text = text.replace(/(?<!\$)\$([^\$\n]{1,200}?)\$(?!\$)/g, (_, math) => {
+    try {
+      return katex.renderToString(math.trim(), { displayMode: false, throwOnError: false });
+    } catch {
+      return `<code class="math-error">$${math}$</code>`;
+    }
+  });
+  return text;
+}
+
 /** Markdown → 清洗后的安全 HTML。内容经远程面板对外提供，必须 sanitize 防 XSS。 */
 function renderMarkdown(text: string): string {
-  const html = marked(text, { async: false }) as string;
+  const withMath = renderMath(text);
+  const html = marked(withMath, { async: false }) as string;
   return DOMPurify.sanitize(html);
 }
 
@@ -57,7 +91,15 @@ function renderContentBlock(content: SessionContent, index: number): React.React
 }
 
 /** 渲染单条会话消息（用户气泡，或 assistant 的 thinking/text/tool 组合）。纯渲染。 */
-export function MessageBlock({ message }: { message: SessionMessage }) {
+export function MessageBlock({
+  message,
+  index,
+  onFork,
+}: {
+  message: SessionMessage;
+  index: number;
+  onFork?: (messageIndex: number) => void;
+}) {
   const { t } = useI18n();
   const isUser = message.role === "user";
 
@@ -79,7 +121,7 @@ export function MessageBlock({ message }: { message: SessionMessage }) {
   if (textParts.length === 0 && toolParts.length === 0 && thinkingParts.length === 0 && imageParts.length === 0 && toolResultParts.length === 0) return null;
 
   return (
-    <div style={{ marginBottom: 18, position: "relative" }}>
+    <div className="message-block" style={{ marginBottom: 18, position: "relative" }}>
       {thinkingParts.map((t, i) => (
         <ThinkingBlock key={`th-${i}`} thinking={t.thinking ?? ""} />
       ))}
@@ -94,6 +136,9 @@ export function MessageBlock({ message }: { message: SessionMessage }) {
       {message.created_at && (
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
             fontSize: 10,
             color: "var(--text-hint)",
             marginTop: 6,
@@ -101,7 +146,27 @@ export function MessageBlock({ message }: { message: SessionMessage }) {
             paddingLeft: 2,
           }}
         >
-          {formatMessageTime(message.created_at, t)}
+          <span>{formatMessageTime(message.created_at, t)}</span>
+          {onFork && (
+            <button
+              onClick={() => onFork(index)}
+              title="从此前住"
+              style={{
+                padding: "1px 6px",
+                fontSize: 10,
+                border: "1px solid var(--border-dim)",
+                borderRadius: 4,
+                background: "transparent",
+                color: "var(--text-hint)",
+                cursor: "pointer",
+                opacity: 0,
+                transition: "opacity 0.15s",
+              }}
+              className="fork-btn"
+            >
+              ⑂ 分叉
+            </button>
+          )}
         </div>
       )}
     </div>

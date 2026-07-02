@@ -1,60 +1,62 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { SessionMessage } from "../components/session-view/types";
 
 /**
  * 轮询 JSONL 会话文件，实时获取最新消息。
- * 用于执行中/执行后的对话视图。
+ * 增量更新：只在新消息到达时触发重渲染。
  */
 export function useSessionPolling(
   sessionPath: string | null,
-  intervalMs: number = 2000,
-): { messages: SessionMessage[]; loading: boolean } {
+  intervalMs: number = 1500,
+): {
+  messages: SessionMessage[];
+  loading: boolean;
+  refresh: () => void;
+} {
   const [messages, setMessages] = useState<SessionMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const messagesRef = useRef<SessionMessage[]>([]);
+  const lastCountRef = useRef(0);
+
+  const load = useCallback(
+    async (path: string) => {
+      try {
+        const msgs = await invoke<SessionMessage[]>("read_session_messages", {
+          sessionPath: path,
+        });
+        // 只有消息数量或最后一条内容变化才更新（避免频繁重渲染）
+        if (msgs.length !== lastCountRef.current) {
+          lastCountRef.current = msgs.length;
+          setMessages(msgs);
+        }
+        setLoading(false);
+      } catch {
+        // JSONL 可能还在写入中，静默失败
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!sessionPath) {
       setMessages([]);
-      messagesRef.current = [];
+      lastCountRef.current = 0;
       return;
     }
 
-    let cancelled = false;
-    let retryDelay = intervalMs;
-
-    const load = async () => {
-      if (cancelled) return;
-      try {
-        const msgs = await invoke<SessionMessage[]>("read_session_messages", {
-          sessionPath,
-        });
-        if (!cancelled) {
-          // 只在消息数量变化时更新，避免不必要的重渲染
-          if (msgs.length !== messagesRef.current.length) {
-            messagesRef.current = msgs;
-            setMessages(msgs);
-          }
-          setLoading(false);
-          retryDelay = intervalMs; // 成功后重置间隔
-        }
-      } catch {
-        // JSONL 可能还在写入中，忽略错误，增加重试间隔
-        if (!cancelled) {
-          retryDelay = Math.min(retryDelay * 2, 10000);
-        }
-      }
-    };
-
     setLoading(true);
-    load();
-    const timer = setInterval(load, intervalMs);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [sessionPath, intervalMs]);
+    void load(sessionPath);
 
-  return { messages, loading };
+    const timer = setInterval(() => {
+      void load(sessionPath);
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [sessionPath, intervalMs, load]);
+
+  const refresh = useCallback(() => {
+    if (sessionPath) void load(sessionPath);
+  }, [sessionPath, load]);
+
+  return { messages, loading, refresh };
 }

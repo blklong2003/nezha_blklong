@@ -650,6 +650,30 @@ pub(crate) enum SessionContent {
     Thinking {
         thinking: String,
     },
+    /// 多模态图片（base64 编码）
+    Image {
+        source: Option<ImageSource>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        media_type: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        data: Option<String>,
+    },
+    /// 工具执行结果（可嵌套 content blocks）
+    ToolResult {
+        #[serde(rename = "tool_use_id")]
+        tool_use_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        content: Option<Vec<SessionContent>>,
+    },
+}
+
+#[derive(serde::Serialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub(crate) enum ImageSource {
+    Base64 {
+        media_type: String,
+        data: String,
+    },
 }
 
 /// 根据已知 session_id 查找对应的 JSONL 文件路径，供前端启动时补填历史任务的 sessionPath。
@@ -1090,15 +1114,39 @@ fn claude_user_content(content: Option<&serde_json::Value>) -> Vec<SessionConten
         Some(serde_json::Value::Array(blocks)) => blocks
             .iter()
             .filter_map(|b| {
-                if b.get("type").and_then(|v| v.as_str()) == Some("text") {
-                    let text = b.get("text").and_then(|v| v.as_str()).unwrap_or("");
-                    if !text.trim().is_empty() {
-                        return Some(SessionContent::Text {
-                            text: text.to_string(),
-                        });
+                let block_type = b.get("type").and_then(|v| v.as_str());
+                match block_type {
+                    Some("text") => {
+                        let text = b.get("text").and_then(|v| v.as_str()).unwrap_or("");
+                        if !text.trim().is_empty() {
+                            return Some(SessionContent::Text {
+                                text: text.to_string(),
+                            });
+                        }
+                        None
                     }
+                    Some("image") => {
+                        // 解析图片 content block
+                        if let Some(source) = b.get("source") {
+                            let source_type = source.get("type").and_then(|v| v.as_str());
+                            if source_type == Some("base64") {
+                                return Some(SessionContent::Image {
+                                    media_type: source
+                                        .get("media_type")
+                                        .and_then(|v| v.as_str())
+                                        .map(String::from),
+                                    data: source
+                                        .get("data")
+                                        .and_then(|v| v.as_str())
+                                        .map(String::from),
+                                    source: None,
+                                });
+                            }
+                        }
+                        None
+                    }
+                    _ => None,
                 }
-                None
             })
             .collect(),
         _ => Vec::new(),
@@ -1140,6 +1188,23 @@ fn claude_assistant_blocks(blocks: &[serde_json::Value]) -> Vec<SessionContent> 
                     if !thinking.trim().is_empty() {
                         parts.push(SessionContent::Thinking {
                             thinking: thinking.to_string(),
+                        });
+                    }
+                }
+            }
+            Some("image") => {
+                if let Some(source) = block.get("source") {
+                    if source.get("type").and_then(|v| v.as_str()) == Some("base64") {
+                        parts.push(SessionContent::Image {
+                            media_type: source
+                                .get("media_type")
+                                .and_then(|v| v.as_str())
+                                .map(String::from),
+                            data: source
+                                .get("data")
+                                .and_then(|v| v.as_str())
+                                .map(String::from),
+                            source: None,
                         });
                     }
                 }
@@ -2285,6 +2350,85 @@ fn format_timestamp_ms(ms: i64) -> String {
         .single()
         .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
         .unwrap_or_else(|| ms.to_string())
+}
+
+// ── 对话分叉 ─────────────────────────────────────────────────────────────────
+
+/// 从源 JSONL 文件中截取前 `message_count` 条消息，写入新文件。
+/// 用于"从此前住"功能：用户选择某条消息作为分叉点，创建新任务继续对话。
+#[tauri::command]
+pub async fn fork_session(
+    source_path: String,
+    message_count: usize,
+) -> Result<String, String> {
+    use std::io::BufRead;
+
+    let src = Path::new(&source_path);
+    if !src.exists() {
+        return Err(format!("Source session file not found: {}", source_path));
+    }
+
+    // 生成新文件路径: session_forked_<timestamp>.jsonl
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let parent = src.parent().unwrap_or(Path::new(""));
+    let forked_path = parent.join(format!("session_forked_{}.jsonl", timestamp));
+
+    let file = File::open(src).map_err(|e| format!("Failed to open source: {}", e))?;
+    let reader = BufReader::new(file);
+
+    let output = File::create(&forked_path)
+        .map_err(|e| format!("Failed to create forked file: {}", e))?;
+    let mut writer = BufWriter::new(output);
+
+    let mut message_idx: usize = 0;
+    let mut last_line = String::new();
+
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("Read error: {}", e))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        // 每条 JSONL 行是一个完整的消息记录
+        writeln!(writer, "{}", line).map_err(|e| format!("Write error: {}", e))?;
+        last_line = line.clone();
+
+        // 解析判断是否是 user/assistant 消息（跳过 system/summary 等）
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) {
+            let msg_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            if msg_type == "user" || msg_type == "assistant" {
+                message_idx += 1;
+                if message_idx >= message_count {
+                    break;
+                }
+            }
+        }
+    }
+
+    // 确保最后一条是 assistant 消息（截断点完整）
+    if message_idx > 0 {
+        // 检查最后一条类型
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&last_line) {
+            let msg_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            if msg_type == "user" {
+                // 如果最后一条是 user，可能需要注入一条 system note
+                let note = serde_json::json!({
+                    "type": "system",
+                    "message": {
+                        "content": "[Previous context truncated — continuing from fork point]"
+                    }
+                });
+                writeln!(writer, "{}", note).ok();
+            }
+        }
+    }
+
+    writer.flush().map_err(|e| format!("Flush error: {}", e))?;
+
+    Ok(forked_path.to_string_lossy().to_string())
 }
 
 // ── 测试 ──────────────────────────────────────────────────────────────────────

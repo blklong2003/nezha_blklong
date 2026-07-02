@@ -107,6 +107,7 @@ export function RunningView({
   getRestoreState,
   onRename,
   onGenerateName,
+  onFork,
   themeVariant,
   terminalFontSize,
   terminalScrollback,
@@ -132,6 +133,7 @@ export function RunningView({
   getRestoreState?: () => { initialData?: string; initialSnapshot?: string };
   onRename: (name: string) => void;
   onGenerateName: () => Promise<void>;
+  onFork?: (taskId: string, messageCount: number) => void;
   themeVariant: ThemeVariant;
   terminalFontSize: TerminalFontSize;
   terminalScrollback: TerminalScrollback;
@@ -763,7 +765,10 @@ export function RunningView({
                 <div style={{ color: "var(--text-hint)", fontSize: 13 }}>{t("session.noMessages")}</div>
               ) : (
                 <>
-                  <MessageList messages={liveMessages} />
+                  <MessageList
+                messages={liveMessages}
+                onFork={onFork ? (idx) => onFork(task.id, idx) : undefined}
+              />
                   {isActive && (
                     <div style={{
                       fontSize: 12,

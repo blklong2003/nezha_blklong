@@ -980,6 +980,55 @@ function App() {
     );
   }
 
+  // ── 对话分叉 ──────────────────────────────────────────────────────────────
+  async function handleForkSession(
+    project: Project,
+    sourceTask: Task,
+    messageCount: number,
+  ) {
+    const sourcePath = sourceTask.claudeSessionPath ?? sourceTask.codexSessionPath;
+    if (!sourcePath) {
+      showToast(t("toast.forkNoSession"), "warning");
+      return;
+    }
+
+    try {
+      const forkedPath = await invoke<string>("fork_session", {
+        sourcePath,
+        messageCount,
+      });
+
+      const newTaskId = `${Date.now()}`;
+      const forkedTask: Task = {
+        id: newTaskId,
+        projectId: project.id,
+        name: `${sourceTask.name ?? "task"} (fork)`,
+        prompt: `(Forked from ${sourceTask.name ?? sourceTask.prompt.slice(0, 30)})`,
+        agent: sourceTask.agent,
+        permissionMode: sourceTask.permissionMode,
+        status: "done",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        claudeSessionPath: sourceTask.agent === "claude" ? forkedPath : undefined,
+        codexSessionPath: sourceTask.agent === "codex" ? forkedPath : undefined,
+        claudeSessionId: sourceTask.agent === "claude" ? `forked_${newTaskId}` : undefined,
+        codexSessionId: sourceTask.agent === "codex" ? `forked_${newTaskId}` : undefined,
+      };
+
+      setTasks((prev) => {
+        const next = [forkedTask, ...prev];
+        persistProjectTasks(project.id, next, showToast, formatSaveTasksError);
+        return next;
+      });
+
+      setActiveProject(project);
+      updateProjectView(project.id, { selectedTaskId: newTaskId, isNewTask: false });
+      showToast(t("toast.forkSuccess"), "success");
+    } catch (err) {
+      showToast(t("toast.forkFailed", { error: String(err) }), "error");
+    }
+  }
+
   function handleRunTodoTask(task: Task) {
     const project = projects.find((p) => p.id === task.projectId);
     if (!project) return;
@@ -1662,6 +1711,7 @@ function App() {
               onDiscardWorktree={handleDiscardWorktree}
               onReconnectTask={handleReconnectTask}
               onMarkTaskDone={handleMarkTaskDone}
+              onForkSession={handleForkSession}
               onInput={tm.handleInput}
               onResize={tm.handleResize}
               onRegisterTerminal={tm.handleRegisterTerminal}

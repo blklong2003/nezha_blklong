@@ -585,6 +585,9 @@ const translations: Record<AppLanguage, Record<string, string>> = {
       "Failed to load project file list, @ references unavailable: {error}",
     "toast.saveProjectsFailed": "Failed to save project list: {error}",
     "toast.saveTasksFailed": "Failed to save tasks for project {projectId}: {error}",
+    "toast.forkNoSession": "This task has no session to fork from",
+    "toast.forkSuccess": "Session forked successfully",
+    "toast.forkFailed": "Failed to fork session: {error}",
   },
   zh: {
     "appSettings.title": "应用设置",
@@ -1140,6 +1143,9 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "toast.loadProjectFilesFailed": "加载项目文件列表失败，@ 引用不可用：{error}",
     "toast.saveProjectsFailed": "保存项目列表失败：{error}",
     "toast.saveTasksFailed": "保存任务失败（项目 {projectId}）：{error}",
+    "toast.forkNoSession": "该任务没有可分叉的会话",
+    "toast.forkSuccess": "会话分叉成功",
+    "toast.forkFailed": "会话分叉失败：{error}",
   },
 };
 

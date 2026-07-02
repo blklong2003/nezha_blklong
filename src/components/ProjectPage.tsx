@@ -59,6 +59,7 @@ export function ProjectPage({
   onMergeWorktree,
   onDiscardWorktree,
   onReconnectTask,
+  onForkSession,
   onMarkTaskDone,
   onInput,
   onResize,
@@ -138,6 +139,7 @@ export function ProjectPage({
   onDiscardWorktree: (id: string) => Promise<void>;
   onReconnectTask: (id: string) => void;
   onMarkTaskDone: (id: string) => void;
+  onForkSession?: (project: import("../types").Project, task: import("../types").Task, messageCount: number) => void;
   onInput: (taskId: string, data: string) => void;
   onResize: (taskId: string, cols: number, rows: number) => void;
   onRegisterTerminal: (
@@ -545,6 +547,10 @@ export function ProjectPage({
                 getRestoreState={() => getTaskRestoreState(selectedTask.id)}
                 onRename={(name) => onRenameTask(selectedTask.id, name)}
                 onGenerateName={() => onGenerateTaskName(selectedTask.id)}
+                onFork={onForkSession ? (taskId, msgCount) => {
+                  const task = projectTasks.find(t => t.id === taskId);
+                  if (task) onForkSession(project, task, msgCount);
+                } : undefined}
                 themeVariant={themeVariant}
                 terminalFontSize={terminalFontSize}
                 terminalScrollback={terminalScrollback}
@@ -589,6 +595,10 @@ export function ProjectPage({
                   getRestoreState={() => getTaskRestoreState(task.id)}
                   onRename={(name) => onRenameTask(task.id, name)}
                   onGenerateName={() => onGenerateTaskName(task.id)}
+                  onFork={onForkSession ? (taskId, msgCount) => {
+                    const t = projectTasks.find(tt => tt.id === taskId);
+                    if (t) onForkSession(project, t, msgCount);
+                  } : undefined}
                   themeVariant={themeVariant}
                   terminalFontSize={terminalFontSize}
                   terminalScrollback={terminalScrollback}

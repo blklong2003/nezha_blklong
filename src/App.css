@@ -290,6 +290,16 @@ body {
   50% { opacity: 0.6; }
 }
 
+/* ── Fork button (visible on hover) ───────────────────────────── */
+.message-block:hover .fork-btn {
+  opacity: 1 !important;
+}
+.fork-btn:hover {
+  background: var(--accent-subtle) !important;
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
 /* ── Scrollbar ──────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;

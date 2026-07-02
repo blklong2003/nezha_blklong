@@ -263,6 +263,7 @@ pub fn run() {
             analytics::read_session_metrics,
             session::resolve_session_path,
             session::read_session_messages,
+            session::fork_session,
             session::export_session_markdown,
             session::delete_session_file,
             session::delete_project_sessions,
