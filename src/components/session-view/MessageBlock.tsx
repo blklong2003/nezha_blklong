@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { Copy, Check } from "lucide-react";
@@ -12,9 +12,19 @@ import { useI18n } from "../../i18n";
 let katexReady = false;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let katexModule: any = null;
+const katexListeners = new Set<() => void>();
+
+/** 通知所有监听者 KaTeX 已加载 */
+function notifyKatexReady() {
+  katexListeners.forEach((fn) => fn());
+  katexListeners.clear();
+}
+
+// KaTeX 动态导入（避免 rolldown 静态打包问题）
 import("katex").then((mod: any) => {
   katexModule = mod.default || mod;
   katexReady = true;
+  notifyKatexReady();
 }).catch(() => {});
 import "katex/dist/katex.min.css";
 
@@ -28,9 +38,13 @@ function formatMessageTime(ts: number, t: (key: string, params?: Record<string, 
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
-/** 渲染 LaTeX 公式（动态使用 KaTeX，未加载时回退到原文）。 */
-function renderMath(text: string): string {
-  if (!katexReady || !katexModule) return text;
+/** 渲染 LaTeX 公式（动态使用 KaTeX，未加载时回退到原文并注册重渲染）。 */
+function renderMath(text: string, onReady?: () => void): string {
+  if (!katexReady || !katexModule) {
+    // KaTeX 未加载完成，注册回调以便加载后重新渲染
+    if (onReady) katexListeners.add(onReady);
+    return text;
+  }
   const katex = katexModule;
   // 块级公式 $$ ... $$
   text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
@@ -52,8 +66,8 @@ function renderMath(text: string): string {
 }
 
 /** Markdown → 清洗后的安全 HTML。内容经远程面板对外提供，必须 sanitize 防 XSS。 */
-function renderMarkdown(text: string): string {
-  const withMath = renderMath(text);
+function renderMarkdown(text: string, onKatexReady?: () => void): string {
+  const withMath = renderMath(text, onKatexReady);
   const html = marked(withMath, { async: false }) as string;
   return DOMPurify.sanitize(html);
 }
@@ -101,6 +115,9 @@ export function MessageBlock({
   onFork?: (messageIndex: number) => void;
 }) {
   const { t } = useI18n();
+  // 用于触发 KaTeX 加载后的重新渲染
+  const [, forceUpdate] = useState(0);
+  const onKatexReady = useCallback(() => forceUpdate((n) => n + 1), []);
   const isUser = message.role === "user";
 
   if (isUser) {
@@ -126,7 +143,7 @@ export function MessageBlock({
         <ThinkingBlock key={`th-${i}`} thinking={t.thinking ?? ""} />
       ))}
       {textParts.map((t, i) => (
-        <AssistantTextBlock key={`tx-${i}`} html={renderMarkdown(t.text ?? "")} />
+        <AssistantTextBlock key={`tx-${i}`} html={renderMarkdown(t.text ?? "", onKatexReady)} />
       ))}
       {toolParts.map((t, i) => (
         <ToolUseCard key={`tu-${i}`} name={t.name ?? ""} input={t.input ?? ""} />

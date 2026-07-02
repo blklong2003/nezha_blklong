@@ -588,6 +588,10 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "toast.forkNoSession": "This task has no session to fork from",
     "toast.forkSuccess": "Session forked successfully",
     "toast.forkFailed": "Failed to fork session: {error}",
+    "quickChat.title": "Quick Chat",
+    "quickChat.placeholder": "Ask something... (Enter to send, Shift+Enter for new line, Esc to close)",
+    "quickChat.inputPlaceholder": "Type your message...",
+    "quickChat.thinking": "Thinking...",
   },
   zh: {
     "appSettings.title": "应用设置",
@@ -1146,6 +1150,10 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     "toast.forkNoSession": "该任务没有可分叉的会话",
     "toast.forkSuccess": "会话分叉成功",
     "toast.forkFailed": "会话分叉失败：{error}",
+    "quickChat.title": "临时对话",
+    "quickChat.placeholder": "输入问题... (Enter 发送, Shift+Enter 换行, Esc 关闭)",
+    "quickChat.inputPlaceholder": "输入消息...",
+    "quickChat.thinking": "思考中...",
   },
 };
 

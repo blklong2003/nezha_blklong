@@ -10,6 +10,7 @@ mod analytics;
 mod app_settings;
 mod cc_switch;
 mod config;
+mod quick_chat;
 mod event_watcher;
 mod feishu;
 mod fs;
@@ -308,6 +309,7 @@ pub fn run() {
             skills::cleanup_installations_for_project,
             skills::delete_skill,
             cc_switch::list_cc_switch_providers,
+            quick_chat::quick_chat,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")

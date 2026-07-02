@@ -38,6 +38,7 @@ import { WelcomePage } from "./components/WelcomePage";
 import { ProjectPage } from "./components/ProjectPage";
 import { SKILL_HUB_CHANGED_EVENT } from "./components/app-settings/types";
 import { useToast } from "./components/Toast";
+import { QuickChat } from "./components/QuickChat";
 import { isHideWindowShortcut } from "./shortcuts";
 import { APP_PLATFORM } from "./platform";
 import { useTerminalManager } from "./hooks/useTerminalManager";
@@ -286,6 +287,7 @@ function App() {
     getInitialTaskDisplayWindow,
   );
   const [attentionBadge, setAttentionBadge] = useState<boolean>(getInitialAttentionBadge);
+  const [showQuickChat, setShowQuickChat] = useState(false);
   const [terminalScrollback, setTerminalScrollbackState] = useState<TerminalScrollback>(
     DEFAULT_TERMINAL_SCROLLBACK,
   );
@@ -466,6 +468,18 @@ function App() {
   useEffect(() => {
     localStorage.setItem(DARK_THEME_STORAGE_KEY, darkThemeMode);
   }, [darkThemeMode]);
+
+  // Quick Chat 全局快捷键: Ctrl+Shift+K / Cmd+Shift+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "K") {
+        e.preventDefault();
+        setShowQuickChat((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     // Tauri window theme only understands light/dark/null; map eyecare to light
@@ -998,7 +1012,8 @@ function App() {
         messageCount,
       });
 
-      const newTaskId = `${Date.now()}`;
+      // 使用递增 nonce 避免同毫秒内重复 ID
+      const newTaskId = `${Date.now()}-${notifications.length}`;
       const forkedTask: Task = {
         id: newTaskId,
         projectId: project.id,
@@ -1793,6 +1808,9 @@ function App() {
           />
         </div>
       )}
+
+      {/* Quick Chat — 全局快捷键 Ctrl+Shift+K 触发 */}
+      {showQuickChat && <QuickChat onClose={() => setShowQuickChat(false)} />}
     </div>
   );
 }

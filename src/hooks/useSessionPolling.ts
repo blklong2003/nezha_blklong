@@ -17,6 +17,7 @@ export function useSessionPolling(
   const [messages, setMessages] = useState<SessionMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const lastCountRef = useRef(0);
+  const messagesRef = useRef<SessionMessage[]>([]);
 
   const load = useCallback(
     async (path: string) => {
@@ -24,9 +25,16 @@ export function useSessionPolling(
         const msgs = await invoke<SessionMessage[]>("read_session_messages", {
           sessionPath: path,
         });
-        // 只有消息数量或最后一条内容变化才更新（避免频繁重渲染）
-        if (msgs.length !== lastCountRef.current) {
+        // 消息数量变化 或 最后一条消息内容变化（流式输出）时更新
+        const lastMsg = msgs[msgs.length - 1];
+        const prevLastMsg = messagesRef.current[messagesRef.current.length - 1];
+        const contentChanged =
+          lastMsg && prevLastMsg
+            ? JSON.stringify(lastMsg) !== JSON.stringify(prevLastMsg)
+            : lastMsg !== prevLastMsg;
+        if (msgs.length !== lastCountRef.current || contentChanged) {
           lastCountRef.current = msgs.length;
+          messagesRef.current = msgs;
           setMessages(msgs);
         }
         setLoading(false);
