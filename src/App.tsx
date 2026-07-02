@@ -39,6 +39,7 @@ import { ProjectPage } from "./components/ProjectPage";
 import { SKILL_HUB_CHANGED_EVENT } from "./components/app-settings/types";
 import { useToast } from "./components/Toast";
 import { QuickChat } from "./components/QuickChat";
+import { CommandPalette } from "./components/command-palette/CommandPalette";
 import { isHideWindowShortcut } from "./shortcuts";
 import { APP_PLATFORM } from "./platform";
 import { useTerminalManager } from "./hooks/useTerminalManager";
@@ -288,6 +289,7 @@ function App() {
   );
   const [attentionBadge, setAttentionBadge] = useState<boolean>(getInitialAttentionBadge);
   const [showQuickChat, setShowQuickChat] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [terminalScrollback, setTerminalScrollbackState] = useState<TerminalScrollback>(
     DEFAULT_TERMINAL_SCROLLBACK,
   );
@@ -475,6 +477,18 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "K") {
         e.preventDefault();
         setShowQuickChat((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Command Palette 全局快捷键: Ctrl+P / Cmd+P
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "p" || e.key === "P")) {
+        e.preventDefault();
+        setShowCommandPalette((v) => !v);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -1813,6 +1827,18 @@ function App() {
 
       {/* Quick Chat — 全局快捷键 Ctrl+Shift+K 触发 */}
       {showQuickChat && <QuickChat onClose={() => setShowQuickChat(false)} />}
+
+      {/* Command Palette — 全局快捷键 Ctrl+P 触发 */}
+      {showCommandPalette && activeProject && (
+        <CommandPalette
+          projectPath={activeProject.path}
+          commands={[]}
+          onOpenFile={(_path) => {
+            // Open file in right panel file viewer (handled by ProjectPage)
+          }}
+          onClose={() => setShowCommandPalette(false)}
+        />
+      )}
     </div>
   );
 }
