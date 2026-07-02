@@ -1738,6 +1738,7 @@ function App() {
               onMoveToGroup={handleMoveToGroup}
               onMoveToHidden={handleToggleProjectHidden}
               onOpen={handleOpen}
+              onOpenQuickChat={() => setShowQuickChat(true)}
               saveNewTaskDraft={saveNewTaskDraft}
               getNewTaskDraft={getNewTaskDraft}
               notifications={notifications}
@@ -1788,6 +1789,7 @@ function App() {
             onToggleProjectHidden={handleToggleProjectHidden}
             skillHubConfig={skillHubConfig}
             onEnterSkillHub={handleEnterSkillHub}
+            onOpenQuickChat={() => setShowQuickChat(true)}
             themeVariant={themeVariant}
             themeMode={themeMode}
             systemPrefersDark={systemPrefersDark}

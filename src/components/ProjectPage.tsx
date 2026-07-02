@@ -26,6 +26,7 @@ import { GitDiffViewer } from "./GitDiffViewer";
 import { ProjectRail } from "./ProjectRail";
 import { AppSettingsDialog } from "./AppSettingsDialog";
 import { RightToolbar } from "./RightToolbar";
+import { MessageSquarePlus } from "lucide-react";
 import { TodoTaskView } from "./TodoTaskView";
 import { ShellTerminalPanel, type ShellTerminalPanelHandle } from "./ShellTerminalPanel";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -100,6 +101,7 @@ export function ProjectPage({
   onMonoFontFamilyChange,
   hubMode = false,
   onExitSkillHub,
+  onOpenQuickChat,
 }: {
   project: Project;
   visible?: boolean;
@@ -186,6 +188,7 @@ export function ProjectPage({
   onMonoFontFamilyChange: (family: FontFamily) => void;
   hubMode?: boolean;
   onExitSkillHub?: () => void;
+  onOpenQuickChat?: () => void;
 }) {
   const { t } = useI18n();
   const {
@@ -670,6 +673,41 @@ export function ProjectPage({
             </ErrorBoundary>
           )}
         </div>
+      )}
+
+      {onOpenQuickChat && (
+        <button
+          onClick={onOpenQuickChat}
+          title="Quick Chat  (Ctrl+Shift+K)"
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 12px",
+            background: "var(--bg-subtle)",
+            border: "1px solid var(--border-medium)",
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+            backdropFilter: "blur(4px)",
+            transition: "background 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--bg-hover)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "var(--bg-subtle)";
+          }}
+        >
+          <MessageSquarePlus size={14} />
+          <span>{t("quickChat.title")}</span>
+        </button>
       )}
 
       <RightToolbar

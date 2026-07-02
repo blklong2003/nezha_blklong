@@ -10,6 +10,7 @@ import {
   Blocks,
   Pin,
   PinOff,
+  MessageSquarePlus,
 } from "lucide-react";
 import type {
   Project,
@@ -122,6 +123,7 @@ export function WelcomePage({
   onMonoFontFamilyChange,
   skillHubConfig,
   onEnterSkillHub,
+  onOpenQuickChat,
 }: {
   projects: Project[];
   allProjects: Project[];
@@ -149,6 +151,7 @@ export function WelcomePage({
   onMonoFontFamilyChange: (family: FontFamily) => void;
   skillHubConfig: SkillHubConfig | null;
   onEnterSkillHub: () => void;
+  onOpenQuickChat: () => void;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -273,6 +276,11 @@ export function WelcomePage({
               </div>
 
               <div style={s.actionRow}>
+                <button style={s.secondaryActionBtn} onClick={onOpenQuickChat}>
+                  <MessageSquarePlus size={14} strokeWidth={2} />
+                  <span>{t("quickChat.title")}</span>
+                  <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 2 }}>⌘⇧K</span>
+                </button>
                 <button style={s.primaryActionBtn} onClick={onOpen}>
                   <Plus size={14} strokeWidth={2.3} />
                   <span>{t("welcome.openProject")}</span>
